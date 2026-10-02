@@ -8,7 +8,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.1' });
 let signInInProgress = false;
 
 function result(value) {

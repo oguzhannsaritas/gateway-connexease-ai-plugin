@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+
+# security(1) prompts on a TTY when -w has no argument. Read the token from a
+# private stdin pipe, then answer the prompt on a pseudo-terminal. Never log
+# the conversation: the terminal could echo the token.
+log_user 0
+set timeout 120
+set account [lindex $argv 0]
+set service [lindex $argv 1]
+set secret [gets stdin]
+if {$secret eq "" || $account eq "" || $service eq ""} {
+    exit 2
+}
+
+spawn /usr/bin/security add-generic-password -a $account -s $service -U -w
+send -- "$secret\r"
+expect {
+    eof {}
+    timeout { exit 3 }
+}
+set result [wait]
+exit [lindex $result 3]

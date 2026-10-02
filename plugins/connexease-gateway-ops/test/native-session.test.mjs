@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { PassThrough, Writable } from 'node:stream';
 import test from 'node:test';
-import { loginWithPassword, MacKeychainStore, NativeSession, promptForGatewayCredentials } from '../src/native-session.mjs';
+import { loginWithPassword, MacKeychainStore, NativeSession, promptForGatewayCredentials, runSecurity } from '../src/native-session.mjs';
 
 const baseUrl = 'https://gateway.example.test/api/v1';
 
@@ -67,6 +69,30 @@ test('Keychain write sends secret on stdin, never in process arguments', async (
   assert.equal(commandArgs.at(-1), '-w');
   assert.equal(commandArgs.includes('refresh-secret'), false);
   assert.equal(secretInput, 'refresh-secret');
+});
+
+test('Keychain write uses a silent pseudo-terminal helper without exposing token in argv', async () => {
+  let command;
+  let args;
+  let input = '';
+  const spawnImpl = (name, commandArgs) => {
+    command = name;
+    args = commandArgs;
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new Writable({
+      write(chunk, _encoding, done) { input += chunk.toString(); done(); },
+      final(done) { queueMicrotask(() => { child.stdout.write('refresh-secret'); child.emit('close', 0); }); done(); },
+    });
+    return child;
+  };
+  const output = await runSecurity(['add-generic-password', '-a', 'default', '-s', 'test-service', '-U', '-w'], 'refresh-secret', spawnImpl);
+  assert.equal(command, '/usr/bin/expect');
+  assert.match(args[0], /keychain-write\.exp$/);
+  assert.equal(args.includes('refresh-secret'), false);
+  assert.equal(input, 'refresh-secret\n');
+  assert.equal(output, '');
 });
 
 test('native dialogs collect credentials without including them in script arguments', async () => {

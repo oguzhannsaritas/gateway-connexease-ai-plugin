@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_API_BASE_URL, GatewayApiClient } from './gateway-api.mjs';
 
 const KEYCHAIN_SERVICE = 'com.connexease.gateway-ai-ops.refresh';
 const KEYCHAIN_ACCOUNT = 'default';
+const KEYCHAIN_WRITE_HELPER = fileURLToPath(new URL('../scripts/keychain-write.exp', import.meta.url));
 
 const EMAIL_DIALOG = 'var app = Application.currentApplication(); app.includeStandardAdditions = true; app.displayDialog("Connexease Gateway email address", {defaultAnswer: "", buttons: ["Cancel", "Next"], defaultButton: "Next"}).textReturned';
 const PASSWORD_DIALOG = 'var app = Application.currentApplication(); app.includeStandardAdditions = true; app.displayDialog("Connexease Gateway password", {defaultAnswer: "", buttons: ["Cancel", "Connect"], defaultButton: "Connect", hiddenAnswer: true}).textReturned';
@@ -36,12 +38,22 @@ export async function promptForGatewayCredentials({ execute = runAppleScript } =
   return { email, password };
 }
 
-function runSecurity(args, input) {
+export function runSecurity(args, input, spawnImpl = spawn) {
   return new Promise((resolve, reject) => {
-    const child = spawn('/usr/bin/security', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const isWrite = input !== undefined;
+    if (isWrite && args.at(-1) !== '-w') {
+      reject(new Error('Invalid Keychain write command'));
+      return;
+    }
+    // security(1) reads a bare -w prompt from a TTY, not a stdin pipe.
+    // Expect supplies that TTY without putting the token in argv or a file.
+    const child = isWrite
+      ? spawnImpl('/usr/bin/expect', [KEYCHAIN_WRITE_HELPER, KEYCHAIN_ACCOUNT, KEYCHAIN_SERVICE], { stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawnImpl('/usr/bin/security', args, { stdio: ['pipe', 'pipe', 'pipe'] });
     let output = '';
     child.stdout.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stdout.on('data', (chunk) => { if (!isWrite) output += chunk; });
+    child.stderr.resume();
     child.on('error', () => reject(new Error('macOS Keychain is unavailable')));
     child.on('close', (code) => {
       if (code === 0) resolve(output.trim());
@@ -71,9 +83,9 @@ export class MacKeychainStore {
   }
 
   async setRefreshToken(token) {
-    if (typeof token !== 'string' || !token) throw new Error('Missing Gateway refresh token');
-    // A bare trailing -w asks security to read the secret from stdin. Never put
-    // credentials in argv, environment variables, stdout, or project files.
+    if (typeof token !== 'string' || !token || /[\r\n\0]/.test(token)) throw new Error('Invalid Gateway refresh token');
+    // The helper answers security's TTY prompt. The token never appears in
+    // process arguments, environment variables, stdout, or project files.
     await this.execute([
       'add-generic-password', '-a', KEYCHAIN_ACCOUNT, '-s', KEYCHAIN_SERVICE, '-U', '-w',
     ], token);
