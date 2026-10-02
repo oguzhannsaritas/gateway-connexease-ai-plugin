@@ -1,0 +1,12 @@
+{
+  "name": "connexease-gateway-ai",
+  "description": "Connexease Gateway account tools for Claude Code",
+  "owner": { "name": "Connexease" },
+  "plugins": [
+    {
+      "name": "connexease-gateway-ops",
+      "source": "./plugins/connexease-gateway-ops",
+      "description": "Read your Gateway applications, WhatsApp templates, webhook status, API key metadata, and sandbox previews"
+    }
+  ]
+}

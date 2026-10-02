@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gateway-account": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/src/server.mjs"]
+    }
+  }
+}
