@@ -8,7 +8,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.2' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.3' });
 let signInInProgress = false;
 
 function result(value) {
@@ -37,7 +37,7 @@ server.registerTool('get_my_profile', {
 }, guarded(() => gateway.getMyProfile()));
 
 server.registerTool('connect_gateway_account', {
-  description: 'Open native macOS email/password dialogs to sign in to the user’s own Gateway account. Never ask for credentials in chat or tool arguments. Only call after the user explicitly requests or accepts account connection.',
+  description: 'Open native macOS email/password dialogs to sign in to a Gateway account chosen by the user. Do not compare its email with a computer or repository identity. Never ask for credentials in chat or tool arguments. Only call after the user explicitly requests or accepts account connection.',
   annotations: { readOnlyHint: false, destructiveHint: false },
 }, guarded(async () => {
   if (process.platform !== 'darwin') throw new Error('In-session sign-in currently supports macOS only');

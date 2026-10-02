@@ -40,6 +40,37 @@ test('reads real-contract applications with bearer authorization', async () => {
   assert.equal(calls[0].options.redirect, 'error');
 });
 
+test('uses the production WhatsApp application route after a generic-route 404', async () => {
+  const paths = [];
+  const client = fixture(async (url) => {
+    paths.push(url.pathname);
+    if (url.pathname === '/api/v1/applications') return response(null, 404);
+    if (url.pathname === '/api/v1/channels/whatsapp/applications') return response([app]);
+    if (url.pathname === '/api/v1/channels/whatsapp/applications/example-app') {
+      return response({ ...app, createdAt: '2026-01-01' });
+    }
+    throw new Error('unexpected path');
+  });
+  assert.deepEqual(await client.listApplications(), [app]);
+  assert.equal((await client.getApplication(app.appId)).appId, app.appId);
+  assert.deepEqual(paths, [
+    '/api/v1/applications',
+    '/api/v1/channels/whatsapp/applications',
+    '/api/v1/channels/whatsapp/applications',
+    '/api/v1/channels/whatsapp/applications/example-app',
+  ]);
+});
+
+test('does not route around an authorization failure on applications', async () => {
+  const paths = [];
+  const client = fixture(async (url) => {
+    paths.push(url.pathname);
+    return response(null, 403);
+  });
+  await assert.rejects(client.listApplications(), /does not have access/);
+  assert.deepEqual(paths, ['/api/v1/applications']);
+});
+
 test('prepares a real-contract text without a write request', async () => {
   const paths = [];
   const client = fixture(async (url, options) => {

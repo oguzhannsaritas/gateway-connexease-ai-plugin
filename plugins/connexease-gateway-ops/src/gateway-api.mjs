@@ -25,7 +25,16 @@ function assertPage(value, name, max) {
   }
 }
 
+class GatewayHttpError extends Error {
+  constructor(status) {
+    super(`Gateway request failed (HTTP ${status})`);
+    this.status = status;
+  }
+}
+
 export class GatewayApiClient {
+  #applicationRoute = '/applications';
+
   constructor({ accessTokenProvider, fetchImpl = fetch, baseUrl = DEFAULT_API_BASE_URL }) {
     if (!accessTokenProvider || typeof accessTokenProvider.getAccessToken !== 'function') {
       throw new Error('A per-user access token provider is required');
@@ -58,7 +67,7 @@ export class GatewayApiClient {
     }
     if (response.status === 401) throw new Error('Gateway session expired; sign in again');
     if (response.status === 403) throw new Error('Gateway account does not have access');
-    if (!response.ok) throw new Error(`Gateway request failed (HTTP ${response.status})`);
+    if (!response.ok) throw new GatewayHttpError(response.status);
 
     let payload;
     try {
@@ -74,6 +83,19 @@ export class GatewayApiClient {
     return (await this.#requestResponse(path)).data;
   }
 
+  async #requestApplication(path = '') {
+    try {
+      return await this.#request(`${this.#applicationRoute}${path}`);
+    } catch (error) {
+      // Production still serves the older WhatsApp-scoped read endpoints.
+      if (this.#applicationRoute !== '/applications' || !(error instanceof GatewayHttpError) || error.status !== 404) {
+        throw error;
+      }
+      this.#applicationRoute = '/channels/whatsapp/applications';
+      return this.#request(`${this.#applicationRoute}${path}`);
+    }
+  }
+
   async getMyProfile() {
     const data = await this.#request('/users/me');
     if (!data || typeof data.id !== 'string' || typeof data.email !== 'string') {
@@ -83,7 +105,7 @@ export class GatewayApiClient {
   }
 
   async listApplications() {
-    const data = requireArray(await this.#request('/applications'), 'applications');
+    const data = requireArray(await this.#requestApplication(), 'applications');
     return data.map((app) => ({
       id: app.id,
       appId: app.appId,
@@ -100,7 +122,7 @@ export class GatewayApiClient {
 
   async getApplication(appId) {
     await this.#requireApplication(appId);
-    const app = await this.#request(`/applications/${encodeURIComponent(appId)}`);
+    const app = await this.#requestApplication(`/${encodeURIComponent(appId)}`);
     if (!app || app.appId !== appId) throw new Error('Gateway returned an invalid application response');
     return {
       id: app.id,

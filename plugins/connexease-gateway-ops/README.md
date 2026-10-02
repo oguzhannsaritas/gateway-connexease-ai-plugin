@@ -8,7 +8,7 @@ After a developer signs in through `/connexease-gateway-ops:connect` inside Clau
 | --- | --- |
 | `get_my_profile` | Reads the signed-in Gateway user's ID, email, and state |
 | `connect_gateway_account` | Opens native macOS credential dialogs and connects the account; returns only profile identity |
-| `list_my_applications` | Reads applications visible to that user |
+| `list_my_applications` | Reads applications visible to the signed-in account; falls back to the production WhatsApp-scoped route where the generic route is absent |
 | `get_application` | Reads basic details for a selected application |
 | `list_whatsapp_templates`, `get_whatsapp_template` | Reads paginated WhatsApp template metadata and a selected template |
 | `get_webhook_status` | Reads webhook status and URL, never secret headers |
@@ -18,7 +18,7 @@ After a developer signs in through `/connexease-gateway-ops:connect` inside Clau
 
 **No MCP tool sends a message.** Preparing a message never calls a write endpoint. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
 
-Account reads are read-only. `connect_gateway_account` creates a local Keychain session, while `prepare_sandbox_text` only builds a local preview. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and sending messages remain disabled. Those operations need a trusted per-action confirmation and, for sandbox sends, backend binding/idempotency work outside this plugin-only scope.
+Account reads are read-only. `connect_gateway_account` attempts to save a local Keychain session and falls back to process memory if Keychain fails, while `prepare_sandbox_text` only builds a local preview. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and sending messages remain disabled. Those operations need a trusted per-action confirmation and, for sandbox sends, backend binding/idempotency work outside this plugin-only scope.
 
 ## Local macOS setup
 
@@ -48,4 +48,4 @@ The panel uses `POST /applications/:appId/sandbox/messages/test` with `{ testNum
 
 A send feature also needs an explicit trusted confirmation tied to the exact app, recipient, and message; durable one-use approval and audit records; and a strategy for ambiguous outcomes that avoids duplicate sends. Do not add a direct `send` MCP tool before these pieces exist.
 
-The authentication and read endpoints are based on the locally available core-service `origin/develop` ref and panel source. The native Keychain/login path and live account read have **not yet been exercised with a real developer account**; test them manually before treating this as a verified production integration.
+The authentication and read endpoints are based on the locally available core-service ref and panel source. A manual production sign-in verified authentication and `/users/me`, but Keychain persistence failed on the test Mac and the generic application-list route returned HTTP 404. Version 0.3.3 falls back to the production WhatsApp-scoped list/detail route on that 404; a signed-in live application read with this fallback still needs manual verification.
