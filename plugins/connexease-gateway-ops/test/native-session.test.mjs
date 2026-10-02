@@ -124,7 +124,7 @@ test('in-session connection verifies the profile, saves refresh token, and uses 
     },
   });
   const profile = await session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' });
-  assert.deepEqual(profile, { id: 'user-1', email: 'dev@example.test', state: 'ACTIVE' });
+  assert.deepEqual(profile, { id: 'user-1', email: 'dev@example.test', state: 'ACTIVE', sessionPersistence: 'keychain' });
   assert.deepEqual(saved, ['new-refresh']);
   assert.equal(await session.getAccessToken(), 'new-access');
   assert.equal(calls.length, 2);
@@ -142,4 +142,32 @@ test('failed profile verification never persists refresh token', async () => {
   });
   await assert.rejects(session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' }), /session expired/);
   assert.equal(writes, 0);
+});
+
+test('Keychain failure keeps the verified account usable in memory, including token refresh', async () => {
+  const calls = [];
+  const session = new NativeSession({
+    baseUrl,
+    store: {
+      getRefreshToken: async () => { throw new Error('must use in-memory token'); },
+      setRefreshToken: async () => { throw new Error('Keychain unavailable'); },
+    },
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      if (url.pathname.endsWith('/auth/token')) return new Response(JSON.stringify({ isSuccess: true, data: {
+        accessToken: 'access-1', refreshToken: 'refresh-1', expiresIn: 0,
+      } }), { status: 200 });
+      if (url.pathname.endsWith('/users/me')) return new Response(JSON.stringify({ isSuccess: true, data: {
+        id: 'user-1', email: 'dev@example.test', state: 'ACTIVE',
+      } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/refresh')) return new Response(JSON.stringify({ isSuccess: true, data: {
+        accessToken: 'access-2', refreshToken: 'refresh-2', expiresIn: 3600,
+      } }), { status: 200 });
+      throw new Error('unexpected request');
+    },
+  });
+  const profile = await session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' });
+  assert.equal(profile.sessionPersistence, 'memory_only');
+  assert.equal(await session.getAccessToken(), 'access-2');
+  assert.deepEqual(JSON.parse(calls[2].options.body), { refreshToken: 'refresh-1' });
 });

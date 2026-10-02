@@ -22,7 +22,7 @@ Inside Claude Code, run:
 /connexease-gateway-ops:connect
 ```
 
-The plugin opens native macOS dialogs for your email and hidden password, verifies your account, then lists your applications. The password is passed to the Gateway authentication endpoint by the local MCP process; it is never sent through the Claude conversation or returned by an MCP tool. The refresh token is stored in your macOS Keychain. Do not share passwords or tokens in prompts, screenshots, logs, or issues. Apple's hidden-answer dialog only masks the screen; like any password login, the local process briefly handles the password in memory.
+The plugin opens native macOS dialogs for your email and hidden password, verifies your account, then lists your applications. The password is passed to the Gateway authentication endpoint by the local MCP process; it is never sent through the Claude conversation or returned by an MCP tool. The plugin attempts to store a refresh token in your macOS Keychain. If Keychain saving fails, it reports `memory_only`: the account can still be used in the current Claude Code session, but you must sign in again after restarting. Do not share passwords or tokens in prompts, screenshots, logs, or issues. Apple's hidden-answer dialog only masks the screen; like any password login, the local process briefly handles the password in memory.
 
 On later sessions, simply ask:
 

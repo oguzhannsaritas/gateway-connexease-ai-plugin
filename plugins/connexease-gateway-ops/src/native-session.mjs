@@ -146,6 +146,8 @@ export class NativeSession {
   #accessToken = null;
   #expiresAt = 0;
   #refreshInFlight = null;
+  #memoryRefreshToken = null;
+  #sessionPersistence = 'memory_only';
 
   constructor({ store = new MacKeychainStore(), fetchImpl = fetch, baseUrl = DEFAULT_API_BASE_URL } = {}) {
     this.store = store;
@@ -161,10 +163,10 @@ export class NativeSession {
       baseUrl: this.baseUrl,
     });
     const profile = await gateway.getMyProfile();
-    await this.store.setRefreshToken(session.refreshToken);
     this.#accessToken = session.accessToken;
     this.#expiresAt = Date.now() + Math.max(0, Number(session.expiresIn) || 0) * 1000;
-    return profile;
+    await this.#rememberRefreshToken(session.refreshToken);
+    return { ...profile, sessionPersistence: this.#sessionPersistence };
   }
 
   async getAccessToken() {
@@ -176,11 +178,21 @@ export class NativeSession {
   }
 
   async #refresh() {
-    const refreshToken = await this.store.getRefreshToken();
+    const refreshToken = this.#memoryRefreshToken ?? await this.store.getRefreshToken();
     const session = await postAuth('/auth/refresh', { refreshToken }, this.fetchImpl, this.baseUrl);
-    await this.store.setRefreshToken(session.refreshToken);
     this.#accessToken = session.accessToken;
     this.#expiresAt = Date.now() + Math.max(0, Number(session.expiresIn) || 0) * 1000;
+    await this.#rememberRefreshToken(session.refreshToken);
     return this.#accessToken;
+  }
+
+  async #rememberRefreshToken(token) {
+    this.#memoryRefreshToken = token;
+    try {
+      await this.store.setRefreshToken(token);
+      this.#sessionPersistence = 'keychain';
+    } catch {
+      this.#sessionPersistence = 'memory_only';
+    }
   }
 }

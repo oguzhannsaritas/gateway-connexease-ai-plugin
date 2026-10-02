@@ -8,7 +8,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.1' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.2' });
 let signInInProgress = false;
 
 function result(value) {
@@ -46,7 +46,15 @@ server.registerTool('connect_gateway_account', {
   try {
     const credentials = await promptForGatewayCredentials();
     const profile = await accessTokenProvider.connectWithCredentials(credentials);
-    return { status: 'connected', id: profile.id, email: profile.email };
+    return {
+      status: 'connected',
+      id: profile.id,
+      email: profile.email,
+      sessionPersistence: profile.sessionPersistence,
+      ...(profile.sessionPersistence === 'memory_only'
+        ? { warning: 'Keychain save failed. This Gateway session works only while this Claude Code session remains open.' }
+        : {}),
+    };
   } finally {
     signInInProgress = false;
   }

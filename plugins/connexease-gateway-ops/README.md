@@ -22,7 +22,7 @@ Account reads are read-only. `connect_gateway_account` creates a local Keychain 
 
 ## Local macOS setup
 
-Requires Node.js 20+, macOS Keychain, and the system `/usr/bin/expect` utility. The Gateway login request goes to `https://api-gateway.connexease.com/api/v1/auth/token` with `X-Client-Type: native`; the password is entered in a masked macOS dialog. The refresh token is stored in the current macOS user's Keychain, never in the repository, an environment variable, or an AI prompt. The Keychain helper answers `security`'s terminal prompt through a private pseudo-terminal; it does not put the token in process arguments or logs. Access tokens stay in the MCP process memory and are renewed through `/auth/refresh`.
+Requires Node.js 20+, macOS Keychain, and the system `/usr/bin/expect` utility. The Gateway login request goes to `https://api-gateway.connexease.com/api/v1/auth/token` with `X-Client-Type: native`; the password is entered in a masked macOS dialog. The plugin attempts to store the refresh token in the current macOS user's Keychain, never in the repository, an environment variable, or an AI prompt. The Keychain helper answers `security`'s terminal prompt through a private pseudo-terminal; it does not put the token in process arguments or logs. If that save fails, the access and refresh tokens remain only in MCP process memory until the Claude Code session ends, and the tool returns `sessionPersistence: memory_only`. Access tokens are renewed through `/auth/refresh`.
 
 ```bash
 npm ci
