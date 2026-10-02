@@ -5,7 +5,7 @@ description: Read the signed-in Connexease Gateway account's applications, Whats
 
 # Gateway sandbox operations
 
-The bundled MCP server reads the developer's real Gateway account after they sign in locally. Start with `get_my_profile` when account identity matters. If it reports that login is required, tell the developer to run `npm run login` in the plugin folder in their own terminal. Never ask them to disclose a password, access token, or refresh token in chat.
+The bundled MCP server reads the developer's real Gateway account after they sign in. Start with `get_my_profile` when account identity matters. If it reports that login is required, direct the developer to `/connexease-gateway-ops:connect`; that command opens native macOS dialogs. Never ask them to disclose a password, access token, or refresh token in chat.
 
 For an application task, call `list_my_applications`, then `list_sandbox_test_numbers` for the chosen application. If the user asks to compose a text, collect the application, test number, and message and call `prepare_sandbox_text`. Show the returned preview and explicitly say `status: not_sent` means no message was sent.
 

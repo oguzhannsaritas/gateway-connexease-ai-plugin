@@ -12,6 +12,7 @@ try {
   const tools = (await client.listTools()).tools.map(({ name }) => name);
   assert.deepEqual([...tools].sort(), [
     'get_my_profile',
+    'connect_gateway_account',
     'list_my_applications',
     'get_application',
     'list_whatsapp_templates',

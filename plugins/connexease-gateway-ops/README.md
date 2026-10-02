@@ -2,11 +2,12 @@
 
 This local Claude Code/MCP plugin is separate from the documentation plugin and the panel repository. It is published in the `plugins/connexease-gateway-ops` directory of the [gateway-connexease-ai-plugin repository](https://github.com/oguzhannsaritas/gateway-connexease-ai-plugin).
 
-After a developer signs in through the **separate terminal login command**, the MCP server reads their real Gateway account. It never takes a password through an AI conversation and never reuses a panel browser cookie or copied token.
+After a developer signs in through `/connexease-gateway-ops:connect` inside Claude Code, the MCP server reads their real Gateway account. The plugin opens native macOS credential dialogs; it never takes a password through an AI conversation and never reuses a panel browser cookie or copied token.
 
 | Tool | Current behavior |
 | --- | --- |
 | `get_my_profile` | Reads the signed-in Gateway user's ID, email, and state |
+| `connect_gateway_account` | Opens native macOS credential dialogs and connects the account; returns only profile identity |
 | `list_my_applications` | Reads applications visible to that user |
 | `get_application` | Reads basic details for a selected application |
 | `list_whatsapp_templates`, `get_whatsapp_template` | Reads paginated WhatsApp template metadata and a selected template |
@@ -17,20 +18,19 @@ After a developer signs in through the **separate terminal login command**, the 
 
 **No MCP tool sends a message.** Preparing a message never calls a write endpoint. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
 
-All tools are currently read-only except `prepare_sandbox_text`, which only builds a local preview. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and sending messages remain disabled. Those operations need a trusted per-action confirmation and, for sandbox sends, backend binding/idempotency work outside this plugin-only scope.
+Account reads are read-only. `connect_gateway_account` creates a local Keychain session, while `prepare_sandbox_text` only builds a local preview. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and sending messages remain disabled. Those operations need a trusted per-action confirmation and, for sandbox sends, backend binding/idempotency work outside this plugin-only scope.
 
 ## Local macOS setup
 
-Requires Node.js 20+ and macOS Keychain. The Gateway login request goes to `https://api-gateway.connexease.com/api/v1/auth/token` with `X-Client-Type: native`; the password is entered with terminal echo disabled. The refresh token is stored in the current macOS user's Keychain, never in the repository, an environment variable, or an AI prompt. Access tokens stay in the MCP process memory and are renewed through `/auth/refresh`.
+Requires Node.js 20+ and macOS Keychain. The Gateway login request goes to `https://api-gateway.connexease.com/api/v1/auth/token` with `X-Client-Type: native`; the password is entered in a masked macOS dialog. The refresh token is stored in the current macOS user's Keychain, never in the repository, an environment variable, or an AI prompt. Access tokens stay in the MCP process memory and are renewed through `/auth/refresh`.
 
 ```bash
 npm ci
 npm test
 npm run probe
-npm run login
 ```
 
-`npm run probe` only checks MCP tool discovery; it does **not** call Gateway. `npm run login` is the first command that contacts the real authentication endpoint. Run it yourself in a trusted interactive terminal; do not give your credentials to an AI assistant. A system Keychain prompt may appear. On success the command checks `/users/me` and prints the connected email.
+`npm run probe` only checks MCP tool discovery; it does **not** call Gateway. The preferred login is `/connexease-gateway-ops:connect` from inside Claude Code. Its native dialogs collect credentials outside the chat, verify `/users/me`, and list applications. Apple's masked field only hides the text on screen; the local plugin process briefly handles the password in memory. If dialogs cannot open, `npm run login` remains a fallback in a trusted interactive terminal; it hides terminal echo and checks `/users/me`.
 
 For development, load this directory as a plugin in a fresh Claude Code session:
 
@@ -38,9 +38,9 @@ For development, load this directory as a plugin in a fresh Claude Code session:
 claude --plugin-dir /absolute/path/to/this/folder
 ```
 
-Use `/connexease-gateway-ops:sandbox-ops`, or simply ask Claude to list your Gateway applications. `/mcp` should show the `gateway-account` server connected. The existing `connexease-gateway-docs` plugin remains independent.
+Use `/connexease-gateway-ops:connect` once to sign in, then ask Claude to list your Gateway applications or use `/connexease-gateway-ops:sandbox-ops`. `/mcp` should show the `gateway-account` server connected. The existing `connexease-gateway-docs` plugin remains independent.
 
-This local stdio plugin does not automatically work in Claude/ChatGPT/Gemini **web chat**. A hosted HTTPS MCP server with per-user browser OAuth authorization is still required for those surfaces; this terminal login is not that integration.
+This local stdio plugin does not automatically work in Claude/ChatGPT/Gemini **web chat**. A hosted HTTPS MCP server with per-user browser OAuth authorization is still required for those surfaces; this native login is not that integration.
 
 ## Before enabling sends
 

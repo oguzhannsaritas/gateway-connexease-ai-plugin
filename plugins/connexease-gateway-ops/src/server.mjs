@@ -2,13 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
-import { NativeSession } from './native-session.mjs';
+import { NativeSession, promptForGatewayCredentials } from './native-session.mjs';
 
 const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.2.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.0' });
+let signInInProgress = false;
 
 function result(value) {
   return {
@@ -34,6 +35,22 @@ server.registerTool('get_my_profile', {
   description: 'Read the profile of the currently signed-in Connexease Gateway user.',
   annotations: { readOnlyHint: true },
 }, guarded(() => gateway.getMyProfile()));
+
+server.registerTool('connect_gateway_account', {
+  description: 'Open native macOS email/password dialogs to sign in to the user’s own Gateway account. Never ask for credentials in chat or tool arguments. Only call after the user explicitly requests or accepts account connection.',
+  annotations: { readOnlyHint: false, destructiveHint: false },
+}, guarded(async () => {
+  if (process.platform !== 'darwin') throw new Error('In-session sign-in currently supports macOS only');
+  if (signInInProgress) throw new Error('Gateway sign-in is already in progress');
+  signInInProgress = true;
+  try {
+    const credentials = await promptForGatewayCredentials();
+    const profile = await accessTokenProvider.connectWithCredentials(credentials);
+    return { status: 'connected', id: profile.id, email: profile.email };
+  } finally {
+    signInInProgress = false;
+  }
+}));
 
 server.registerTool('list_my_applications', {
   description: 'List applications in the signed-in Connexease Gateway account.',

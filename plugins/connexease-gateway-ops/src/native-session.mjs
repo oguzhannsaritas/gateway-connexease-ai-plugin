@@ -1,8 +1,40 @@
 import { spawn } from 'node:child_process';
-import { DEFAULT_API_BASE_URL } from './gateway-api.mjs';
+import { DEFAULT_API_BASE_URL, GatewayApiClient } from './gateway-api.mjs';
 
 const KEYCHAIN_SERVICE = 'com.connexease.gateway-ai-ops.refresh';
 const KEYCHAIN_ACCOUNT = 'default';
+
+const EMAIL_DIALOG = 'var app = Application.currentApplication(); app.includeStandardAdditions = true; app.displayDialog("Connexease Gateway email address", {defaultAnswer: "", buttons: ["Cancel", "Next"], defaultButton: "Next"}).textReturned';
+const PASSWORD_DIALOG = 'var app = Application.currentApplication(); app.includeStandardAdditions = true; app.displayDialog("Connexease Gateway password", {defaultAnswer: "", buttons: ["Cancel", "Connect"], defaultButton: "Connect", hiddenAnswer: true}).textReturned';
+
+function runAppleScript(script) {
+  return new Promise((resolve, reject) => {
+    // The script contains no credentials. Dialog answers travel only through
+    // this child's stdout pipe and are never returned to the MCP client.
+    const child = spawn('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.resume();
+    child.on('error', () => reject(new Error('macOS sign-in dialog is unavailable')));
+    child.on('close', (code) => {
+      if (code === 0) resolve(output.replace(/\r?\n$/, ''));
+      else reject(new Error('Gateway sign-in cancelled or macOS dialog unavailable'));
+    });
+  });
+}
+
+/** Credentials are collected by macOS dialogs, not by an AI chat message. */
+export async function promptForGatewayCredentials({ execute = runAppleScript } = {}) {
+  if (process.platform !== 'darwin' && execute === runAppleScript) {
+    throw new Error('In-session sign-in currently supports macOS only');
+  }
+  const email = (await execute(EMAIL_DIALOG)).trim();
+  if (!email.includes('@')) throw new Error('A valid Gateway email address is required');
+  const password = await execute(PASSWORD_DIALOG);
+  if (!password) throw new Error('Gateway password is required');
+  return { email, password };
+}
 
 function runSecurity(args, input) {
   return new Promise((resolve, reject) => {
@@ -34,7 +66,7 @@ export class MacKeychainStore {
         'find-generic-password', '-a', KEYCHAIN_ACCOUNT, '-s', KEYCHAIN_SERVICE, '-w',
       ]);
     } catch {
-      throw new Error('Gateway login required. Run npm run login in a terminal.');
+      throw new Error('Gateway login required. Run /connexease-gateway-ops:connect in Claude Code.');
     }
   }
 
@@ -85,7 +117,7 @@ async function postAuth(path, body, fetchImpl, baseUrl) {
   return data;
 }
 
-/** Called only by the separate human-operated terminal command, never by MCP. */
+/** Called by a native, human-operated prompt; never accepts MCP tool arguments. */
 export async function loginWithPassword({ email, password, fetchImpl = fetch, baseUrl = DEFAULT_API_BASE_URL }) {
   if (typeof email !== 'string' || !email.includes('@') || typeof password !== 'string' || !password) {
     throw new Error('Email and password are required');
@@ -107,6 +139,20 @@ export class NativeSession {
     this.store = store;
     this.fetchImpl = fetchImpl;
     this.baseUrl = baseUrl;
+  }
+
+  async connectWithCredentials({ email, password }) {
+    const session = await loginWithPassword({ email, password, fetchImpl: this.fetchImpl, baseUrl: this.baseUrl });
+    const gateway = new GatewayApiClient({
+      accessTokenProvider: { getAccessToken: async () => session.accessToken },
+      fetchImpl: this.fetchImpl,
+      baseUrl: this.baseUrl,
+    });
+    const profile = await gateway.getMyProfile();
+    await this.store.setRefreshToken(session.refreshToken);
+    this.#accessToken = session.accessToken;
+    this.#expiresAt = Date.now() + Math.max(0, Number(session.expiresIn) || 0) * 1000;
+    return profile;
   }
 
   async getAccessToken() {

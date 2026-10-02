@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loginWithPassword, MacKeychainStore, NativeSession } from '../src/native-session.mjs';
+import { loginWithPassword, MacKeychainStore, NativeSession, promptForGatewayCredentials } from '../src/native-session.mjs';
 
 const baseUrl = 'https://gateway.example.test/api/v1';
 
@@ -67,4 +67,53 @@ test('Keychain write sends secret on stdin, never in process arguments', async (
   assert.equal(commandArgs.at(-1), '-w');
   assert.equal(commandArgs.includes('refresh-secret'), false);
   assert.equal(secretInput, 'refresh-secret');
+});
+
+test('native dialogs collect credentials without including them in script arguments', async () => {
+  const scripts = [];
+  const credentials = await promptForGatewayCredentials({ execute: async (script) => {
+    scripts.push(script);
+    return scripts.length === 1 ? 'dev@example.test' : 'private-password';
+  } });
+  assert.deepEqual(credentials, { email: 'dev@example.test', password: 'private-password' });
+  assert.match(scripts[1], /hiddenAnswer: true/);
+  assert.doesNotMatch(scripts.join(' '), /dev@example\.test|private-password/);
+});
+
+test('in-session connection verifies the profile, saves refresh token, and uses new access token', async () => {
+  const saved = [];
+  const calls = [];
+  const session = new NativeSession({
+    baseUrl,
+    store: { setRefreshToken: async (token) => { saved.push(token); }, getRefreshToken: async () => { throw new Error('should not refresh'); } },
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      if (url.pathname.endsWith('/auth/token')) return new Response(JSON.stringify({ isSuccess: true, data: {
+        accessToken: 'new-access', refreshToken: 'new-refresh', expiresIn: 3600,
+      } }), { status: 200 });
+      if (url.pathname.endsWith('/users/me')) return new Response(JSON.stringify({ isSuccess: true, data: {
+        id: 'user-1', email: 'dev@example.test', state: 'ACTIVE',
+      } }), { status: 200 });
+      throw new Error('unexpected request');
+    },
+  });
+  const profile = await session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' });
+  assert.deepEqual(profile, { id: 'user-1', email: 'dev@example.test', state: 'ACTIVE' });
+  assert.deepEqual(saved, ['new-refresh']);
+  assert.equal(await session.getAccessToken(), 'new-access');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].options.headers.Authorization, 'Bearer new-access');
+});
+
+test('failed profile verification never persists refresh token', async () => {
+  let writes = 0;
+  const session = new NativeSession({
+    baseUrl,
+    store: { setRefreshToken: async () => { writes += 1; } },
+    fetchImpl: async (url) => url.pathname.endsWith('/auth/token')
+      ? new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'access', refreshToken: 'refresh', expiresIn: 3600 } }), { status: 200 })
+      : new Response(JSON.stringify({ isSuccess: false }), { status: 401 }),
+  });
+  await assert.rejects(session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' }), /session expired/);
+  assert.equal(writes, 0);
 });
