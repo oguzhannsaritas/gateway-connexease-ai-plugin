@@ -3,25 +3,19 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
 import { NativeSession, promptForGatewayCredentials } from './native-session.mjs';
+import { toolResult } from './tool-result.mjs';
 
 const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.3' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.4' });
 let signInInProgress = false;
-
-function result(value) {
-  return {
-    content: [{ type: 'text', text: JSON.stringify(value) }],
-    structuredContent: value,
-  };
-}
 
 function guarded(operation) {
   return async (args) => {
     try {
-      return result(await operation(args));
+      return toolResult(await operation(args));
     } catch (error) {
       return {
         isError: true,
