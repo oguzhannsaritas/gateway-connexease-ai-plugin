@@ -1,12 +1,12 @@
 # Connexease Gateway AI plugin
 
-A Claude Code plugin for reading a developer's own Connexease Gateway account. This is an early, **read-only** release. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin).
+A Claude Code plugin for a developer's Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin).
 
-The plugin can read your profile, applications, WhatsApp templates, webhook status, API key metadata, and sandbox test numbers. It can prepare a sandbox text preview, but **does not send messages** or change panel settings. Raw API keys and secret webhook headers are never returned to Claude.
+The plugin can read your profile, applications, WhatsApp templates, webhook status, API key metadata, and sandbox test numbers. It can also add a sandbox test number and make one real sandbox WhatsApp text send after explicit chat approval and a native macOS confirmation. Raw API keys and secret webhook headers are never returned to Claude.
 
 ## Install in Claude Code
 
-Requires macOS, Node.js 20+, npm, and Claude Code. Authentication currently uses native macOS dialogs and the signed-in user's Keychain. It has not yet been live-tested with a real Gateway account.
+Requires macOS, Node.js 20+, npm, and Claude Code. Authentication currently uses native macOS dialogs and attempts to use the signed-in user's Keychain.
 
 Install the marketplace plugin and start Claude Code:
 
@@ -32,11 +32,13 @@ Gateway hesabımdaki uygulamaları listele.
 
 You can also invoke `/connexease-gateway-ops:sandbox-ops`. If Claude asks permission for the `gateway-account` MCP server or the connection tool, review the request before accepting. If native dialogs cannot open, the separate terminal `npm run login` command remains a fallback; see [the plugin README](plugins/connexease-gateway-ops/README.md). `npm run probe` only verifies tool discovery; it does not contact Gateway.
 
+For a real sandbox text test, ask Claude to show your application's test numbers. You can select one or provide another E.164 number to add. Adding it and sending a message are separate actions. Before a send, Claude must show the selected application, recipient and exact message, ask for approval, then open a macOS confirmation dialog. A successful API response means the Gateway accepted the send; it does not prove WhatsApp delivery.
+
 ## Scope and limitations
 
 - This release is local Claude Code integration on macOS. It is not a ChatGPT, Gemini, or Claude web-chat connector.
-- No tool sends a message, creates or revokes an API key, or edits a webhook or template. `prepare_sandbox_text` returns `status: not_sent`.
-- The login and live account reads have automated tests with HTTP stubs, but have **not** been verified against a real user account yet. The native dialog has only been syntax-checked, not interactively tested. Please report sanitized errors without credentials or account data.
+- `add_sandbox_test_number` and `send_sandbox_text` are the only account writes. No tool creates or revokes an API key or edits a webhook or template. `prepare_sandbox_text` remains read-only and returns `status: not_sent`.
+- The sandbox write flow has automated tests with HTTP stubs, but has **not** been used to send a real message in this release. The production backend does not provide an idempotency key for this endpoint. If a send fails or times out, check sandbox history before retrying; do not assume it failed.
 - The published source is open to inspect. No credentials, account data, or `node_modules` are committed.
 
 For implementation details and developer checks, see [the plugin README](plugins/connexease-gateway-ops/README.md).

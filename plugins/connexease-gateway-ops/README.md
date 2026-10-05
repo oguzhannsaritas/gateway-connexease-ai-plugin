@@ -15,10 +15,12 @@ After a developer signs in through `/connexease-gateway-ops:connect` inside Clau
 | `list_api_key_metadata` | Reads paginated key names and limits, never raw API keys |
 | `list_sandbox_test_numbers` | Reads test numbers for one of those applications; returns `{ items: [...] }` |
 | `prepare_sandbox_text` | Validates a test number and previews a message with `status: not_sent` |
+| `add_sandbox_test_number` | Adds an E.164 test number after native macOS confirmation; detects an existing number |
+| `send_sandbox_text` | Makes one real sandbox WhatsApp text send after native macOS confirmation; does not retry |
 
-**No MCP tool sends a message.** Preparing a message never calls a write endpoint. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
+`prepare_sandbox_text` never sends. `send_sandbox_text` is a real external action: the skill requires the exact preview and explicit chat approval, and the tool independently requires a native macOS confirmation with the recipient and full message. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
 
-Account reads are read-only. `connect_gateway_account` attempts to save a local Keychain session and falls back to process memory if Keychain fails, while `prepare_sandbox_text` only builds a local preview. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and sending messages remain disabled. Those operations need a trusted per-action confirmation and, for sandbox sends, backend binding/idempotency work outside this plugin-only scope.
+Account reads are read-only. `connect_gateway_account` attempts to save a local Keychain session and falls back to process memory if Keychain fails. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and template-message sends remain disabled.
 
 ## Local macOS setup
 
@@ -42,10 +44,10 @@ Use `/connexease-gateway-ops:connect` once to sign in, then ask Claude to list y
 
 This local stdio plugin does not automatically work in Claude/ChatGPT/Gemini **web chat**. A hosted HTTPS MCP server with per-user browser OAuth authorization is still required for those surfaces; this native login is not that integration.
 
-## Before enabling sends
+## Real sandbox safeguards and remaining limitations
 
-The panel uses `POST /applications/:appId/sandbox/messages/test` with `{ testNumberId, messageType: "CUSTOM", message }`. The core-service `origin/develop` send handler checks the application's organization and active status, but its test-number lookup currently filters by organization and number ID rather than app ID. Confirm the intended cross-application behavior and add the correct binding before exposing any AI-driven send.
+The plugin uses the panel's `POST /applications/:appId/sandbox/test-numbers` and `POST /applications/:appId/sandbox/messages/test` contracts. It lists numbers first, asks whether to use one or add another, and rechecks the selected number's `appId`, phone and label immediately before the single send request. Adding a number is separately confirmed and does not imply approval to send. Native confirmation details travel through a private stdin pipe, not process arguments. The message preview is deliberately shown in chat for user approval. Test-number additions may be limited by the backend (currently five active numbers per application).
 
-A send feature also needs an explicit trusted confirmation tied to the exact app, recipient, and message; durable one-use approval and audit records; and a strategy for ambiguous outcomes that avoids duplicate sends. Do not add a direct `send` MCP tool before these pieces exist.
+The locally inspected core-service `origin/develop` send handler checks application ownership, but its test-number lookup filters by organization and number ID rather than app ID. The plugin's application-scoped list and recheck prevent cross-application sends through this plugin, but the backend should also enforce that binding. The backend records sandbox actions, but it has no idempotency key for this endpoint; the plugin makes one POST with no automatic retry. A timeout, network error, server error or malformed success response can leave the outcome unknown. Check Gateway sandbox history before any manual retry. `accepted_by_gateway` is not a delivery receipt.
 
-The authentication and read endpoints are based on the locally available core-service ref and panel source. A manual production sign-in verified authentication and `/users/me`, but Keychain persistence failed on the test Mac and the generic application-list route returned HTTP 404. Version 0.3.3 added fallback to the production WhatsApp-scoped list/detail route; the resulting array exposed an MCP `structuredContent` validation bug. Version 0.3.4 wraps list results in `{ items: [...] }` and tests them against the SDK's actual `CallToolResultSchema`. A signed-in live application read with this version still needs manual verification.
+The authentication and read endpoints are based on the locally available core-service ref and panel source. A manual production sign-in verified authentication and `/users/me`, but Keychain persistence failed on the test Mac and the generic application-list route returned HTTP 404. Version 0.3.3 added fallback to the production WhatsApp-scoped list/detail route; version 0.3.4 fixed the MCP list-result shape. The new write tools are verified with isolated contract tests only. No real test number was added or message sent during development.

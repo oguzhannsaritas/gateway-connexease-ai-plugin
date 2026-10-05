@@ -2,15 +2,28 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
+import { confirmGatewayAction } from './native-confirm.mjs';
 import { NativeSession, promptForGatewayCredentials } from './native-session.mjs';
+import { addSandboxTestNumber, sendSandboxText } from './sandbox-workflow.mjs';
 import { toolResult } from './tool-result.mjs';
 
 const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.3.4' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.4.0' });
 let signInInProgress = false;
+let sandboxWriteInProgress = false;
+
+async function oneSandboxWrite(operation) {
+  if (sandboxWriteInProgress) throw new Error('Another sandbox write is already in progress');
+  sandboxWriteInProgress = true;
+  try {
+    return await operation();
+  } finally {
+    sandboxWriteInProgress = false;
+  }
+}
 
 function guarded(operation) {
   return async (args) => {
@@ -102,7 +115,27 @@ server.registerTool('prepare_sandbox_text', {
     testNumberId: z.uuid(),
     message: z.string().min(1).max(4096),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false },
+  annotations: { readOnlyHint: true },
 }, guarded((args) => gateway.prepareSandboxText(args)));
+
+server.registerTool('add_sandbox_test_number', {
+  description: 'Add an E.164 sandbox test number to a selected application after an exact native macOS confirmation. The user must explicitly request adding it. Never use this tool for a different account or application.',
+  inputSchema: {
+    appId: z.string().min(1).max(100),
+    phoneNumber: z.string().min(7).max(16),
+    title: z.string().min(1).max(50).optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+}, guarded((args) => oneSandboxWrite(() => addSandboxTestNumber(gateway, confirmGatewayAction, args))));
+
+server.registerTool('send_sandbox_text', {
+  description: 'Make one real sandbox WhatsApp text send to a registered test number in the selected application, only after explicit user request and exact native macOS confirmation. Never retry automatically; an error may mean the outcome is unknown.',
+  inputSchema: {
+    appId: z.string().min(1).max(100),
+    testNumberId: z.uuid(),
+    message: z.string().min(1).max(4096),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+}, guarded((args) => oneSandboxWrite(() => sendSandboxText(gateway, confirmGatewayAction, args))));
 
 await server.connect(new StdioServerTransport());

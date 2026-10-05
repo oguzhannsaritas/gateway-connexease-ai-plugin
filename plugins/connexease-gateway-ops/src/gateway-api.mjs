@@ -48,7 +48,7 @@ export class GatewayApiClient {
     this.fetchImpl = fetchImpl;
   }
 
-  async #requestResponse(path) {
+  async #requestResponse(path, { method = 'GET', body } = {}) {
     const token = await this.accessTokenProvider.getAccessToken();
     if (typeof token !== 'string' || !token) throw new Error('Gateway login required');
     const url = new URL(`${this.baseUrl}${path}`);
@@ -57,30 +57,50 @@ export class GatewayApiClient {
     let response;
     try {
       response = await this.fetchImpl(url, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         redirect: 'error',
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(method === 'GET' ? 10000 : 20000),
       });
     } catch {
-      throw new Error('Gateway is unreachable; no account data was loaded');
+      throw new Error(method === 'GET'
+        ? 'Gateway is unreachable; no account data was loaded'
+        : 'Gateway write outcome is unknown. Check the panel before retrying.');
     }
     if (response.status === 401) throw new Error('Gateway session expired; sign in again');
     if (response.status === 403) throw new Error('Gateway account does not have access');
+    if (method !== 'GET' && response.status >= 500) {
+      throw new Error('Gateway write outcome is unknown. Check the panel before retrying.');
+    }
     if (!response.ok) throw new GatewayHttpError(response.status);
 
     let payload;
     try {
       payload = await response.json();
     } catch {
-      throw new Error('Gateway returned an invalid JSON response');
+      throw new Error(method === 'GET'
+        ? 'Gateway returned an invalid JSON response'
+        : 'Gateway write outcome is unknown. Check the panel before retrying.');
     }
-    if (!payload || payload.isSuccess === false) throw new Error('Gateway request was not successful');
+    if (!payload || payload.isSuccess === false) {
+      throw new Error(method === 'GET'
+        ? 'Gateway request was not successful'
+        : 'Gateway write outcome is unknown. Check the panel before retrying.');
+    }
     return payload;
   }
 
   async #request(path) {
     return (await this.#requestResponse(path)).data;
+  }
+
+  async #post(path, body) {
+    return (await this.#requestResponse(path, { method: 'POST', body })).data;
   }
 
   async #requestApplication(path = '') {
@@ -190,6 +210,43 @@ export class GatewayApiClient {
     }));
   }
 
+  async prepareSandboxTestNumber({ appId, phoneNumber, title }) {
+    assertIdentifier(appId, 'appId');
+    if (typeof phoneNumber !== 'string') throw new Error('phoneNumber must be in E.164 format');
+    const normalizedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+    if (!/^\+[1-9]\d{6,14}$/.test(normalizedPhoneNumber)) {
+      throw new Error('phoneNumber must be in E.164 format');
+    }
+    if (title !== undefined && (typeof title !== 'string' || !title.trim() || title.length > 50 || /[\r\n\0]/.test(title))) {
+      throw new Error('title must contain 1-50 characters');
+    }
+    const numbers = await this.listTestNumbers(appId);
+    const existing = numbers.find((number) => number.phoneNumber === normalizedPhoneNumber);
+    if (existing) return { status: 'already_exists', number: existing };
+    return {
+      status: 'ready',
+      preview: { applicationId: appId, phoneNumber: normalizedPhoneNumber, ...(title === undefined ? {} : { title }) },
+    };
+  }
+
+  async createSandboxTestNumber(prepared) {
+    if (prepared?.status !== 'ready') throw new Error('A confirmed test-number preview is required');
+    const { applicationId: appId, phoneNumber, title } = prepared.preview;
+    const current = await this.prepareSandboxTestNumber({ appId, phoneNumber, title });
+    if (current.status === 'already_exists') return current;
+    const data = await this.#post(`/applications/${encodeURIComponent(appId)}/sandbox/test-numbers`, {
+      phoneNumber,
+      ...(title === undefined ? {} : { title }),
+    });
+    if (!data || data.appId !== appId || data.phoneNumber !== phoneNumber || typeof data.id !== 'string') {
+      throw new Error('Gateway test-number creation outcome is unknown. Check the panel before retrying.');
+    }
+    return {
+      status: 'created',
+      number: { id: data.id, appId: data.appId, title: data.title, phoneNumber: data.phoneNumber },
+    };
+  }
+
   async prepareSandboxText({ appId, testNumberId, message }) {
     assertIdentifier(appId, 'appId');
     assertUuid(testNumberId, 'testNumberId');
@@ -208,7 +265,36 @@ export class GatewayApiClient {
         phoneNumber: number.phoneNumber,
         message,
       },
-      nextStep: 'Sending remains disabled until a trusted, explicit confirmation flow is implemented.',
+      nextStep: 'Ask the user to approve this exact preview, then use send_sandbox_text. A native confirmation is also required.',
+    };
+  }
+
+  async sendSandboxText(prepared) {
+    if (prepared?.status !== 'not_sent') throw new Error('A confirmed sandbox preview is required');
+    const approved = prepared.preview;
+    const current = await this.prepareSandboxText({
+      appId: approved.applicationId,
+      testNumberId: approved.testNumberId,
+      message: approved.message,
+    });
+    if (current.preview.phoneNumber !== approved.phoneNumber || current.preview.testNumber !== approved.testNumber) {
+      throw new Error('Sandbox recipient changed; review and confirm again');
+    }
+    const data = await this.#post(
+      `/applications/${encodeURIComponent(approved.applicationId)}/sandbox/messages/test`,
+      { testNumberId: approved.testNumberId, messageType: 'CUSTOM', message: approved.message },
+    );
+    if (!data || data.testNumberId !== approved.testNumberId || data.to !== approved.phoneNumber) {
+      throw new Error('Gateway sandbox send outcome is unknown. Check sandbox history before retrying.');
+    }
+    return {
+      status: 'accepted_by_gateway',
+      applicationId: approved.applicationId,
+      testNumberId: data.testNumberId,
+      to: data.to,
+      messageId: data.messageId ?? null,
+      elapsedMs: data.elapsedMs,
+      deliveryConfirmed: false,
     };
   }
 }

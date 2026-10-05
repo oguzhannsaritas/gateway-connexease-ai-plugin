@@ -21,6 +21,8 @@ try {
     'list_api_key_metadata',
     'list_sandbox_test_numbers',
     'prepare_sandbox_text',
+    'add_sandbox_test_number',
+    'send_sandbox_text',
   ].sort());
   console.log(JSON.stringify({
     tools,
