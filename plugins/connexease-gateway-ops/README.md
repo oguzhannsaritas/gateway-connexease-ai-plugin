@@ -15,12 +15,14 @@ After a developer signs in through `/connexease-gateway-ops:connect` inside Clau
 | `list_api_key_metadata` | Reads paginated key names and limits, never raw API keys |
 | `list_sandbox_test_numbers` | Reads test numbers for one of those applications; returns `{ items: [...] }` |
 | `prepare_sandbox_text` | Validates a test number and previews a message with `status: not_sent` |
+| `prepare_sandbox_template` | Validates an approved template, its variables, and an app-owned test number; previews without sending |
 | `add_sandbox_test_number` | Adds an E.164 test number after native macOS confirmation; detects an existing number |
 | `send_sandbox_text` | Makes one real sandbox WhatsApp text send after native macOS confirmation; does not retry |
+| `send_sandbox_template` | Makes one real sandbox WhatsApp template send after native macOS confirmation; does not retry |
 
-`prepare_sandbox_text` never sends. `send_sandbox_text` is a real external action: the skill requires the exact preview and explicit chat approval, and the tool independently requires a native macOS confirmation with the recipient and full message. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
+Both `prepare_*` tools never send. Both `send_*` tools are real external actions: the skill requires an exact preview and explicit chat approval, and the tool independently requires a native macOS confirmation with the recipient and content. The package has no mock account/data layer; automated tests use isolated HTTP stubs and never access production.
 
-Account reads are read-only. `connect_gateway_account` attempts to save a local Keychain session and falls back to process memory if Keychain fails. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys, editing webhooks or templates, and template-message sends remain disabled.
+Account reads are read-only. `connect_gateway_account` attempts to save a local Keychain session and falls back to process memory if Keychain fails. The two paginated list tools return `items` and `pagingMetadata`; request additional pages with `pageNumber` as needed. This is not a complete panel automation plugin yet: creating/revoking keys and editing webhooks or templates remain disabled.
 
 ## Local macOS setup
 
@@ -50,4 +52,6 @@ The plugin uses the panel's `POST /applications/:appId/sandbox/test-numbers` and
 
 The locally inspected core-service `origin/develop` send handler checks application ownership, but its test-number lookup filters by organization and number ID rather than app ID. The plugin's application-scoped list and recheck prevent cross-application sends through this plugin, but the backend should also enforce that binding. The backend records sandbox actions, but it has no idempotency key for this endpoint; the plugin makes one POST with no automatic retry. A timeout, network error, server error or malformed success response can leave the outcome unknown. Check Gateway sandbox history before any manual retry. `accepted_by_gateway` is not a delivery receipt.
 
-The authentication and read endpoints are based on the locally available core-service ref and panel source. A manual production sign-in verified authentication and `/users/me`, but Keychain persistence failed on the test Mac and the generic application-list route returned HTTP 404. Version 0.3.3 added fallback to the production WhatsApp-scoped list/detail route; version 0.3.4 fixed the MCP list-result shape. The new write tools are verified with isolated contract tests only. No real test number was added or message sent during development.
+Template sends use `messageType: TEMPLATE` and the Gateway template's internal UUID (not its Meta `sourceId`). The plugin reads and revalidates the approved template immediately before sending, including its exact components and dynamic parameters. Static `REQUEST_CONTACT_INFO` buttons need no parameter. Carousel, product and unsupported components are blocked. Template parameters are visible to Claude as part of the preview, so do not use secret values. Template sending has automated contract tests only; an actual template delivery and the contact-info button have not been verified live.
+
+The authentication and read endpoints are based on the locally available core-service ref and panel source. A manual production sign-in verified authentication and `/users/me`, but Keychain persistence failed on the test Mac and the generic application-list route returned HTTP 404. Version 0.3.3 added fallback to the production WhatsApp-scoped list/detail route; version 0.3.4 fixed the MCP list-result shape. The write tools are verified with isolated contract tests only. No real test number was added or message sent during development.

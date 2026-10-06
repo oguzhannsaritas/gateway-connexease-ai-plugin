@@ -12,3 +12,10 @@ export async function sendSandboxText(gateway, confirm, args) {
   if (!approved) return { status: 'cancelled', sent: false };
   return gateway.sendSandboxText(prepared);
 }
+
+export async function sendSandboxTemplate(gateway, confirm, args) {
+  const prepared = await gateway.prepareSandboxTemplate(args);
+  const approved = await confirm({ kind: 'send_sandbox_template', preview: prepared.preview });
+  if (!approved) return { status: 'cancelled', sent: false };
+  return gateway.sendSandboxTemplate(prepared);
+}

@@ -1,3 +1,5 @@
+import { validateTemplateParameters } from './template-parameters.mjs';
+
 export const DEFAULT_API_BASE_URL = 'https://api-gateway.connexease.com/api/v1';
 
 function assertIdentifier(value, name) {
@@ -173,8 +175,8 @@ export class GatewayApiClient {
     await this.#requireApplication(appId);
     const template = await this.#request(`/channels/whatsapp/applications/${encodeURIComponent(appId)}/templates/${encodeURIComponent(sourceId)}`);
     if (!template || template.sourceId !== sourceId) throw new Error('Gateway returned an invalid template response');
-    const { name, language, category, status, components, qualityScore, rejectedReason } = template;
-    return { sourceId, name, language, category, status, components, qualityScore, rejectedReason };
+    const { id, name, language, category, status, components, qualityScore, rejectedReason } = template;
+    return { id, sourceId, name, language, category, status, components, qualityScore, rejectedReason };
   }
 
   async getWebhookStatus(appId) {
@@ -292,6 +294,80 @@ export class GatewayApiClient {
       applicationId: approved.applicationId,
       testNumberId: data.testNumberId,
       to: data.to,
+      messageId: data.messageId ?? null,
+      elapsedMs: data.elapsedMs,
+      deliveryConfirmed: false,
+    };
+  }
+
+  async prepareSandboxTemplate({ appId, testNumberId, sourceId, parameters }) {
+    assertIdentifier(appId, 'appId');
+    assertUuid(testNumberId, 'testNumberId');
+    assertIdentifier(sourceId, 'sourceId');
+    const numbers = await this.listTestNumbers(appId);
+    const number = numbers.find((item) => item.id === testNumberId && item.appId === appId);
+    if (!number) throw new Error('Test number not found in this application');
+    const template = await this.getWhatsappTemplate(appId, sourceId);
+    if (template.status !== 'APPROVED') throw new Error('Only APPROVED templates can be sent');
+    assertUuid(template.id, 'template.id');
+    if (!Array.isArray(template.components) || template.components.length === 0) {
+      throw new Error('Template components are unavailable; cannot safely preview a send');
+    }
+    const validatedParameters = validateTemplateParameters(template, parameters);
+    return {
+      status: 'not_sent',
+      preview: {
+        applicationId: appId,
+        testNumberId,
+        testNumber: number.title,
+        phoneNumber: number.phoneNumber,
+        template: {
+          id: template.id,
+          sourceId: template.sourceId,
+          name: template.name,
+          language: template.language,
+          category: template.category,
+          status: template.status,
+          components: template.components,
+        },
+        parameters: validatedParameters,
+      },
+      nextStep: 'Show this exact template, recipient and parameters to the user. After explicit approval, call send_sandbox_template; a native confirmation is also required.',
+    };
+  }
+
+  async sendSandboxTemplate(prepared) {
+    if (prepared?.status !== 'not_sent') throw new Error('A confirmed sandbox template preview is required');
+    const approved = prepared.preview;
+    const current = await this.prepareSandboxTemplate({
+      appId: approved.applicationId,
+      testNumberId: approved.testNumberId,
+      sourceId: approved.template.sourceId,
+      parameters: approved.parameters,
+    });
+    if (JSON.stringify(current.preview) !== JSON.stringify(approved)) {
+      throw new Error('Sandbox template or recipient changed; review and confirm again');
+    }
+    const data = await this.#post(
+      `/applications/${encodeURIComponent(approved.applicationId)}/sandbox/messages/test`,
+      {
+        testNumberId: approved.testNumberId,
+        messageType: 'TEMPLATE',
+        templateId: approved.template.id,
+        ...(Object.keys(approved.parameters).length ? { parameters: approved.parameters } : {}),
+      },
+    );
+    if (!data || data.testNumberId !== approved.testNumberId || data.to !== approved.phoneNumber || data.messageType !== 'TEMPLATE') {
+      throw new Error('Gateway sandbox template send outcome is unknown. Check sandbox history before retrying.');
+    }
+    return {
+      status: 'accepted_by_gateway',
+      applicationId: approved.applicationId,
+      testNumberId: data.testNumberId,
+      to: data.to,
+      templateId: approved.template.id,
+      templateName: approved.template.name,
+      language: approved.template.language,
       messageId: data.messageId ?? null,
       elapsedMs: data.elapsedMs,
       deliveryConfirmed: false,

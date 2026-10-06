@@ -2,7 +2,7 @@
 
 A Claude Code plugin for a developer's Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin).
 
-The plugin can read your profile, applications, WhatsApp templates, webhook status, API key metadata, and sandbox test numbers. It can also add a sandbox test number and make one real sandbox WhatsApp text send after explicit chat approval and a native macOS confirmation. Raw API keys and secret webhook headers are never returned to Claude.
+The plugin can read your profile, applications, WhatsApp templates, webhook status, API key metadata, and sandbox test numbers. It can also add a sandbox test number and make one real sandbox WhatsApp text or approved template send after explicit chat approval and a native macOS confirmation. Raw API keys and secret webhook headers are never returned to Claude.
 
 ## Install in Claude Code
 
@@ -34,10 +34,12 @@ You can also invoke `/connexease-gateway-ops:sandbox-ops`. If Claude asks permis
 
 For a real sandbox text test, ask Claude to show your application's test numbers. You can select one or provide another E.164 number to add. Adding it and sending a message are separate actions. Before a send, Claude must show the selected application, recipient and exact message, ask for approval, then open a macOS confirmation dialog. A successful API response means the Gateway accepted the send; it does not prove WhatsApp delivery.
 
+For a template test, ask Claude to list the application's approved templates, select the template and test number, and show a preview before sending. For example: `Bu uygulamadaki onaylı WhatsApp template'lerini listele. Seçtiğim template'i kayıtlı test numarama göndermeden önce içeriğini ve parametrelerini göster.` The template goes through Gateway's real `TEMPLATE` sandbox endpoint, not a text-message substitute. The native confirmation is still required; no real send was made during development.
+
 ## Scope and limitations
 
 - This release is local Claude Code integration on macOS. It is not a ChatGPT, Gemini, or Claude web-chat connector.
-- `add_sandbox_test_number` and `send_sandbox_text` are the only account writes. No tool creates or revokes an API key or edits a webhook or template. `prepare_sandbox_text` remains read-only and returns `status: not_sent`.
+- `add_sandbox_test_number`, `send_sandbox_text`, and `send_sandbox_template` are the only account writes. No tool creates or revokes an API key or edits a webhook or template. Both `prepare_sandbox_text` and `prepare_sandbox_template` remain read-only and return `status: not_sent`.
 - The sandbox write flow has automated tests with HTTP stubs, but has **not** been used to send a real message in this release. The production backend does not provide an idempotency key for this endpoint. If a send fails or times out, check sandbox history before retrying; do not assume it failed.
 - The published source is open to inspect. No credentials, account data, or `node_modules` are committed.
 

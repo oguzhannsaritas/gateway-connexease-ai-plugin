@@ -4,16 +4,32 @@ import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
 import { confirmGatewayAction } from './native-confirm.mjs';
 import { NativeSession, promptForGatewayCredentials } from './native-session.mjs';
-import { addSandboxTestNumber, sendSandboxText } from './sandbox-workflow.mjs';
+import { addSandboxTestNumber, sendSandboxTemplate, sendSandboxText } from './sandbox-workflow.mjs';
 import { toolResult } from './tool-result.mjs';
 
 const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.4.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.5.0' });
 let signInInProgress = false;
 let sandboxWriteInProgress = false;
+
+const templateParametersSchema = z.object({
+  headerText: z.array(z.string().min(1)).optional(),
+  headerMedia: z.object({
+    type: z.enum(['IMAGE', 'VIDEO', 'DOCUMENT']),
+    link: z.string().min(1).optional(),
+    id: z.string().min(1).optional(),
+    filename: z.string().min(1).optional(),
+  }).strict().optional(),
+  body: z.array(z.string().min(1)).optional(),
+  buttons: z.array(z.object({
+    index: z.number().int().min(0),
+    subType: z.enum(['URL', 'COPY_CODE', 'QUICK_REPLY']),
+    value: z.string().min(1),
+  }).strict()).optional(),
+}).strict();
 
 async function oneSandboxWrite(operation) {
   if (sandboxWriteInProgress) throw new Error('Another sandbox write is already in progress');
@@ -137,5 +153,27 @@ server.registerTool('send_sandbox_text', {
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
 }, guarded((args) => oneSandboxWrite(() => sendSandboxText(gateway, confirmGatewayAction, args))));
+
+server.registerTool('prepare_sandbox_template', {
+  description: 'Read an APPROVED WhatsApp template, verify the selected test number belongs to the application, validate template parameters and preview the real template send. Does NOT send.',
+  inputSchema: {
+    appId: z.string().min(1).max(100),
+    testNumberId: z.uuid(),
+    sourceId: z.string().min(1).max(100),
+    parameters: templateParametersSchema.optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, guarded((args) => gateway.prepareSandboxTemplate(args)));
+
+server.registerTool('send_sandbox_template', {
+  description: 'Make one real sandbox WhatsApp TEMPLATE send to a registered test number, only after explicit user approval of the preview and exact native macOS confirmation. Unsupported template components are blocked. Never retry automatically.',
+  inputSchema: {
+    appId: z.string().min(1).max(100),
+    testNumberId: z.uuid(),
+    sourceId: z.string().min(1).max(100),
+    parameters: templateParametersSchema.optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+}, guarded((args) => oneSandboxWrite(() => sendSandboxTemplate(gateway, confirmGatewayAction, args))));
 
 await server.connect(new StdioServerTransport());

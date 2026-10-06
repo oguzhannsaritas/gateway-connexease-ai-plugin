@@ -43,5 +43,24 @@ export async function confirmGatewayAction(action, { execute = runNativeConfirma
       approveLabel: 'Send',
     });
   }
+  if (action.kind === 'send_sandbox_template') {
+    const { applicationId, phoneNumber, testNumber, template, parameters } = action.preview;
+    const safeLabel = String(testNumber).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100);
+    const safeTemplateName = String(template.name).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100);
+    const review = JSON.stringify({
+      templateId: template.id,
+      sourceId: template.sourceId,
+      name: template.name,
+      language: template.language,
+      category: template.category,
+      components: template.components,
+      parameters,
+    }, null, 2);
+    return execute({
+      prompt: `Send ONE REAL sandbox WhatsApp TEMPLATE message?\nApplication: ${applicationId}\nRecipient: ${safeLabel} (${phoneNumber})\nTemplate: ${safeTemplateName} (${template.language})\nReview the exact template and parameters below. Send makes one request; delivery is not guaranteed.`,
+      value: review,
+      approveLabel: 'Send',
+    });
+  }
   throw new Error('Unknown Gateway confirmation action');
 }

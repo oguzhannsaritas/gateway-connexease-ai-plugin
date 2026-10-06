@@ -23,6 +23,8 @@ try {
     'prepare_sandbox_text',
     'add_sandbox_test_number',
     'send_sandbox_text',
+    'prepare_sandbox_template',
+    'send_sandbox_template',
   ].sort());
   console.log(JSON.stringify({
     tools,
