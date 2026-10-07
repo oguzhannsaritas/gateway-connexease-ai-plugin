@@ -6,7 +6,7 @@
     {
       "name": "connexease-gateway-ops",
       "source": "./plugins/connexease-gateway-ops",
-      "description": "Read your Gateway account and send confirmed sandbox WhatsApp text or approved template messages"
+      "description": "Manage your Gateway account, applications, templates, webhooks and sandbox operations with native confirmation"
     }
   ]
 }

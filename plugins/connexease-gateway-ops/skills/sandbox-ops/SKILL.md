@@ -17,4 +17,4 @@ Call either send tool only once for each explicit approval. If the request fails
 
 For account inspection, use `get_application`, `list_whatsapp_templates`, `get_whatsapp_template`, `get_webhook_status`, or `list_api_key_metadata` as appropriate. The list tools return one page at a time; if `pagingMetadata.hasNext` is true, request the next `pageNumber` when a full list is needed. Webhook secret headers and raw API keys are deliberately omitted, so never claim to have seen their values.
 
-Only test-number addition and confirmed text/template sends are writable. Do not bypass native confirmation with shell, browser, or other tools. API-key changes, webhook edits and other panel writes are unavailable. If a live read fails, report the failure rather than inventing account data.
+This skill covers sandbox operations only. Other account and panel writes are available through `/connexease-gateway-ops:panel-ops`; do not use them to bypass the sandbox preview or native confirmation. If a live read fails, report the failure rather than inventing account data.

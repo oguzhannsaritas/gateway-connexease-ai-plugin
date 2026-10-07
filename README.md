@@ -1,14 +1,10 @@
 # Connexease Gateway AI plugin
 
-A Claude Code plugin for a developer's Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin).
-
-The plugin can read your profile, applications, WhatsApp templates, webhook status, API key metadata, and sandbox test numbers. It can also add a sandbox test number and make one real sandbox WhatsApp text or approved template send after explicit chat approval and a native macOS confirmation. Raw API keys and secret webhook headers are never returned to Claude.
+A local Claude Code plugin for a developer's own Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin). Current plugin version: 0.6.0.
 
 ## Install in Claude Code
 
-Requires macOS, Node.js 20+, npm, and Claude Code. Authentication currently uses native macOS dialogs and attempts to use the signed-in user's Keychain.
-
-Install the marketplace plugin and start Claude Code:
+Requires macOS, Node.js 20+, npm, and Claude Code. Authentication uses native macOS dialogs and the signed-in user's Keychain.
 
 ```bash
 claude plugin marketplace add oguzhannsaritas/gateway-connexease-ai-plugin
@@ -16,31 +12,25 @@ claude plugin install connexease-gateway-ops@connexease-gateway-ai
 claude
 ```
 
-Inside Claude Code, run:
+Inside Claude Code, run `/connexease-gateway-ops:connect`. The password is entered in a hidden local dialog, not a chat prompt. If Keychain persistence fails, the plugin reports that the session is memory-only; if it cannot remove an older stored token, it warns that the older account may return after restart.
+
+After connecting, ask naturally, for example:
 
 ```text
-/connexease-gateway-ops:connect
+Gateway hesabımdaki uygulamaları ve WhatsApp sağlık durumlarını göster.
+Bu uygulamanın webhook durumunu ve onaylı template'lerini listele.
+Test numaralarını göster; seçtiğim numaraya mesajı göndermeden önce önizlet.
 ```
 
-The plugin opens native macOS dialogs for your email and hidden password, verifies your account, then lists your applications. The password is passed to the Gateway authentication endpoint by the local MCP process; it is never sent through the Claude conversation or returned by an MCP tool. The plugin attempts to store a refresh token in your macOS Keychain. If Keychain saving fails, it reports `memory_only`: the account can still be used in the current Claude Code session, but you must sign in again after restarting. Do not share passwords or tokens in prompts, screenshots, logs, or issues. Apple's hidden-answer dialog only masks the screen; like any password login, the local process briefly handles the password in memory.
+`/connexease-gateway-ops:panel-ops` explains available account, application, template, webhook, billing, insight, and security operations. `/connexease-gateway-ops:sandbox-ops` walks through a real sandbox send. Writes require explicit approval in chat and a second native macOS confirmation. Secrets are entered or displayed locally, never passed to Claude in tool arguments or responses. A successful sandbox API response means Gateway accepted the request, not that WhatsApp delivered it.
 
-On later sessions, simply ask:
+For updates after publication:
 
-```text
-Gateway hesabımdaki uygulamaları listele.
+```bash
+claude plugin marketplace update connexease-gateway-ai
+claude plugin update connexease-gateway-ops@connexease-gateway-ai
 ```
 
-You can also invoke `/connexease-gateway-ops:sandbox-ops`. If Claude asks permission for the `gateway-account` MCP server or the connection tool, review the request before accepting. If native dialogs cannot open, the separate terminal `npm run login` command remains a fallback; see [the plugin README](plugins/connexease-gateway-ops/README.md). `npm run probe` only verifies tool discovery; it does not contact Gateway.
+Restart Claude Code after updating. See [capability matrix](CAPABILITY_MATRIX.md) for supported operations and the separately reported gaps, and [implementation details](plugins/connexease-gateway-ops/README.md) for local validation and security boundaries.
 
-For a real sandbox text test, ask Claude to show your application's test numbers. You can select one or provide another E.164 number to add. Adding it and sending a message are separate actions. Before a send, Claude must show the selected application, recipient and exact message, ask for approval, then open a macOS confirmation dialog. A successful API response means the Gateway accepted the send; it does not prove WhatsApp delivery.
-
-For a template test, ask Claude to list the application's approved templates, select the template and test number, and show a preview before sending. For example: `Bu uygulamadaki onaylı WhatsApp template'lerini listele. Seçtiğim template'i kayıtlı test numarama göndermeden önce içeriğini ve parametrelerini göster.` The template goes through Gateway's real `TEMPLATE` sandbox endpoint, not a text-message substitute. The native confirmation is still required; no real send was made during development.
-
-## Scope and limitations
-
-- This release is local Claude Code integration on macOS. It is not a ChatGPT, Gemini, or Claude web-chat connector.
-- `add_sandbox_test_number`, `send_sandbox_text`, and `send_sandbox_template` are the only account writes. No tool creates or revokes an API key or edits a webhook or template. Both `prepare_sandbox_text` and `prepare_sandbox_template` remain read-only and return `status: not_sent`.
-- The sandbox write flow has automated tests with HTTP stubs, but has **not** been used to send a real message in this release. The production backend does not provide an idempotency key for this endpoint. If a send fails or times out, check sandbox history before retrying; do not assume it failed.
-- The published source is open to inspect. No credentials, account data, or `node_modules` are committed.
-
-For implementation details and developer checks, see [the plugin README](plugins/connexease-gateway-ops/README.md).
+This is a local Claude Code plugin, not a ChatGPT/Gemini/Claude web-chat connector. Those surfaces require a hosted HTTPS MCP server and per-user browser OAuth.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
 import test from 'node:test';
-import { loginWithPassword, MacKeychainStore, NativeSession, promptForGatewayCredentials, runSecurity } from '../src/native-session.mjs';
+import { loginWithPassword, MacKeychainStore, NativeSession, promptForGatewayCredentials, promptForGatewayOtp, promptForGatewayRegistration, promptForNewPassword, promptForPasswordChange, runSecurity } from '../src/native-session.mjs';
 
 const baseUrl = 'https://gateway.example.test/api/v1';
 
@@ -106,6 +106,42 @@ test('native dialogs collect credentials without including them in script argume
   assert.doesNotMatch(scripts.join(' '), /dev@example\.test|private-password/);
 });
 
+test('registration and password-change dialogs hide passwords and keep them out of scripts', async () => {
+  const registrationScripts = [];
+  const registrationAnswers = ['Ada', 'Lovelace', 'ada@example.test', 'new-secret', 'new-secret'];
+  const registration = await promptForGatewayRegistration({ execute: async (script) => {
+    registrationScripts.push(script);
+    return registrationAnswers[registrationScripts.length - 1];
+  } });
+  assert.deepEqual(registration, { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', password: 'new-secret' });
+  assert.match(registrationScripts[3], /hiddenAnswer: true/);
+  assert.match(registrationScripts[4], /hiddenAnswer: true/);
+  assert.doesNotMatch(registrationScripts.join(' '), /new-secret/);
+
+  const passwordScripts = [];
+  const answers = ['old-secret', 'replacement-secret', 'replacement-secret'];
+  const change = await promptForPasswordChange({ execute: async (script) => {
+    passwordScripts.push(script);
+    return answers[passwordScripts.length - 1];
+  } });
+  assert.deepEqual(change, { currentPassword: 'old-secret', newPassword: 'replacement-secret', confirmPassword: 'replacement-secret' });
+  assert.equal(passwordScripts.every((script) => script.includes('hiddenAnswer: true')), true);
+  assert.doesNotMatch(passwordScripts.join(' '), /old-secret|replacement-secret/);
+});
+
+test('OTP and reset-password dialogs keep code and new password out of scripts', async () => {
+  const otpScripts = [];
+  const code = await promptForGatewayOtp({ execute: async (script) => { otpScripts.push(script); return '123456'; } });
+  assert.equal(code, '123456');
+  assert.match(otpScripts[0], /hiddenAnswer: true/);
+  assert.doesNotMatch(otpScripts[0], /123456/);
+  const scripts = [];
+  const passwords = await promptForNewPassword({ execute: async (script) => { scripts.push(script); return 'new-secret'; } });
+  assert.deepEqual(passwords, { newPassword: 'new-secret', confirmPassword: 'new-secret' });
+  assert.equal(scripts.every((script) => script.includes('hiddenAnswer: true')), true);
+  assert.doesNotMatch(scripts.join(' '), /new-secret/);
+});
+
 test('in-session connection verifies the profile, saves refresh token, and uses new access token', async () => {
   const saved = [];
   const calls = [];
@@ -170,4 +206,98 @@ test('Keychain failure keeps the verified account usable in memory, including to
   assert.equal(profile.sessionPersistence, 'memory_only');
   assert.equal(await session.getAccessToken(), 'access-2');
   assert.deepEqual(JSON.parse(calls[2].options.body), { refreshToken: 'refresh-1' });
+});
+
+test('failed Keychain overwrite clears an old account token before reporting memory-only login', async () => {
+  let clears = 0;
+  const session = new NativeSession({
+    baseUrl,
+    store: {
+      setRefreshToken: async () => { throw new Error('write failed'); },
+      deleteRefreshToken: async () => { clears += 1; },
+    },
+    fetchImpl: async (url) => url.pathname.endsWith('/auth/token')
+      ? new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'new-access', refreshToken: 'new-refresh', expiresIn: 3600 } }), { status: 200 })
+      : new Response(JSON.stringify({ isSuccess: true, data: { id: 'user-2', email: 'new@example.test' } }), { status: 200 }),
+  });
+  const profile = await session.connectWithCredentials({ email: 'new@example.test', password: 'new-password' });
+  assert.equal(profile.sessionPersistence, 'memory_only');
+  assert.equal(clears, 1);
+});
+
+test('disconnect clears local session and reports remote revocation separately', async () => {
+  const calls = [];
+  let clears = 0;
+  const session = new NativeSession({
+    baseUrl,
+    store: {
+      setRefreshToken: async () => {},
+      deleteRefreshToken: async () => { clears += 1; },
+      getRefreshToken: async () => { throw new Error('Gateway login required'); },
+    },
+    fetchImpl: async (url, options) => {
+      calls.push({ path: url.pathname, options });
+      if (url.pathname.endsWith('/auth/token')) return new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'access', refreshToken: 'refresh', expiresIn: 3600 } }), { status: 200 });
+      if (url.pathname.endsWith('/users/me')) return new Response(JSON.stringify({ isSuccess: true, data: { id: 'user-1', email: 'dev@example.test' } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/logout')) return new Response(JSON.stringify({ isSuccess: true, data: null }), { status: 200 });
+      throw new Error('unexpected request');
+    },
+  });
+  await session.connectWithCredentials({ email: 'dev@example.test', password: 'private-password' });
+  assert.deepEqual(await session.disconnect(), { status: 'disconnected', keychainCleared: true, gatewayRevoked: true });
+  assert.equal(clears, 1);
+  assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer access');
+  assert.deepEqual(JSON.parse(calls.at(-1).options.body), { refreshToken: 'refresh' });
+  await assert.rejects(session.getAccessToken(), /login required/i);
+});
+
+test('registration and password change adopt newly issued tokens without exposing them to tools', async () => {
+  const calls = [];
+  const saved = [];
+  const session = new NativeSession({
+    baseUrl,
+    store: { setRefreshToken: async (token) => { saved.push(token); }, getRefreshToken: async () => { throw new Error('unexpected refresh'); } },
+    fetchImpl: async (url, options) => {
+      calls.push({ path: url.pathname, options });
+      if (url.pathname.endsWith('/users/register')) return new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'registration-access', refreshToken: 'registration-refresh', expiresIn: 3600 } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/password/change')) return new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'changed-access', refreshToken: 'changed-refresh', expiresIn: 3600 } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/organizations/assign')) return new Response(JSON.stringify({ isSuccess: true, data: { accessToken: 'assigned-access', refreshToken: 'assigned-refresh', expiresIn: 3600 } }), { status: 200 });
+      if (url.pathname.endsWith('/users/me')) return new Response(JSON.stringify({ isSuccess: true, data: { id: 'user-1', email: 'ada@example.test', state: 'ACTIVE' } }), { status: 200 });
+      throw new Error(`unexpected ${url.pathname}`);
+    },
+  });
+  const registered = await session.registerWithCredentials({ firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', password: 'new-secret' });
+  assert.equal(registered.email, 'ada@example.test');
+  assert.equal(await session.getAccessToken(), 'registration-access');
+  const changed = await session.changePassword({ currentPassword: 'new-secret', newPassword: 'replacement-secret', confirmPassword: 'replacement-secret' });
+  assert.equal(changed.id, 'user-1');
+  assert.equal(await session.getAccessToken(), 'changed-access');
+  assert.equal(calls.find(({ path }) => path.endsWith('/auth/password/change')).options.headers.Authorization, 'Bearer registration-access');
+  const assigned = await session.assignOrganization({ organizationName: 'Example', organizationWebsite: 'https://example.test', businessRole: 'developer', accountType: 'business' });
+  assert.equal(assigned.id, 'user-1');
+  assert.equal(await session.getAccessToken(), 'assigned-access');
+  assert.equal(calls.find(({ path }) => path.endsWith('/auth/organizations/assign')).options.headers.Authorization, 'Bearer changed-access');
+  assert.deepEqual(saved, ['registration-refresh', 'changed-refresh', 'assigned-refresh']);
+});
+
+test('password reset keeps the one-time token inside the native session', async () => {
+  const calls = [];
+  const session = new NativeSession({
+    baseUrl,
+    store: { getRefreshToken: async () => { throw new Error('not needed'); } },
+    fetchImpl: async (url, options) => {
+      calls.push({ path: url.pathname, body: JSON.parse(options.body) });
+      if (url.pathname.endsWith('/auth/two-factor/send')) return new Response(JSON.stringify({ isSuccess: true, data: { status: 'SENT' } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/two-factor/verify')) return new Response(JSON.stringify({ isSuccess: true, data: { passwordResetToken: 'private-reset-token', expiresAt: '2026-10-06T14:00:00Z' } }), { status: 200 });
+      if (url.pathname.endsWith('/auth/password/reset')) return new Response(JSON.stringify({ isSuccess: true, data: null }), { status: 200 });
+      throw new Error(`unexpected ${url.pathname}`);
+    },
+  });
+  await session.startPasswordReset('+15555550101');
+  const verified = await session.verifyPasswordResetCode('123456');
+  assert.equal(verified.status, 'verified');
+  assert.doesNotMatch(JSON.stringify(verified), /private-reset-token/);
+  assert.deepEqual(await session.finishPasswordReset({ newPassword: 'new-secret', confirmPassword: 'new-secret' }), { status: 'password_reset', signInRequired: true });
+  assert.equal(calls[2].body.passwordResetToken, 'private-reset-token');
+  await assert.rejects(session.finishPasswordReset({ newPassword: 'new-secret', confirmPassword: 'new-secret' }), /Verify the password reset code/);
 });

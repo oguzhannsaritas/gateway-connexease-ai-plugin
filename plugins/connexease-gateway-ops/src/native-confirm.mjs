@@ -62,5 +62,26 @@ export async function confirmGatewayAction(action, { execute = runNativeConfirma
       approveLabel: 'Send',
     });
   }
+  if (action.kind === 'panel_action') {
+    const review = JSON.stringify(action.preview.details, null, 2);
+    const safeAction = String(action.preview.action).replace(/[^a-z_]/g, '').slice(0, 60);
+    return execute({
+      prompt: `Perform ONE REAL Gateway panel action: ${safeAction}?\nReview the exact before/after details below. This changes your live account. An uncertain result must be checked in the panel before any retry.`,
+      value: review,
+      approveLabel: 'Apply',
+    });
+  }
   throw new Error('Unknown Gateway confirmation action');
+}
+
+/** Show a newly created credential locally; never put its value in an MCP result. */
+export async function showGatewaySecret({ label, secret }, { execute = runNativeConfirmation } = {}) {
+  if (process.platform !== 'darwin' && execute === runNativeConfirmation) {
+    throw new Error('Secret disclosure currently requires macOS');
+  }
+  return execute({
+    prompt: `${String(label).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100)} was created. Copy the secret below now. Do not paste it into Claude or an issue. You can also manage this credential in Gateway panel.`,
+    value: secret,
+    approveLabel: 'Done',
+  });
 }

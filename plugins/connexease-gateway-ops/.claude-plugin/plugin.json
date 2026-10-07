@@ -1,6 +1,6 @@
 {
   "name": "connexease-gateway-ops",
-  "description": "Read Gateway account data and send confirmed sandbox WhatsApp text or approved template messages",
-  "version": "0.5.0",
+  "description": "Manage a Gateway account through scoped API tools and confirmed sandbox operations",
+  "version": "0.6.0",
   "author": { "name": "Connexease" }
 }

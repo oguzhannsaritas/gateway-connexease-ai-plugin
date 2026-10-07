@@ -43,7 +43,7 @@ test('reads real-contract applications with bearer authorization', async () => {
 test('uses the production WhatsApp application route after a generic-route 404', async () => {
   const paths = [];
   const client = fixture(async (url) => {
-    paths.push(url.pathname);
+    paths.push(`${url.pathname}${url.search}`);
     if (url.pathname === '/api/v1/applications') return response(null, 404);
     if (url.pathname === '/api/v1/channels/whatsapp/applications') return response([app]);
     if (url.pathname === '/api/v1/channels/whatsapp/applications/example-app') {
@@ -57,8 +57,22 @@ test('uses the production WhatsApp application route after a generic-route 404',
     '/api/v1/applications',
     '/api/v1/channels/whatsapp/applications',
     '/api/v1/channels/whatsapp/applications',
-    '/api/v1/channels/whatsapp/applications/example-app',
+    '/api/v1/channels/whatsapp/applications/example-app?expand=channel',
   ]);
+});
+
+test('profile and expanded application detail expose panel identity fields without channel secrets', async () => {
+  const client = fixture(async (url) => {
+    if (url.pathname.endsWith('/users/me')) return response({ id: 'user-1', email: 'dev@example.test', state: 'ACTIVE', firstName: 'Ada', lastName: 'Lovelace', phoneNumber: '+15555550101', accessToken: 'never-show' });
+    if (url.pathname === '/api/v1/applications') return response([app]);
+    if (url.pathname.endsWith('/applications/example-app')) return response({ ...app, contact: { name: 'Ada', email: 'dev@example.test', phoneNumber: '+15555550101' }, channel: { platform: 'whatsapp', wabaId: 'waba-1', phoneNumber: '+15555550102', businessUsername: 'example', secret: 'never-show' } });
+    throw new Error(`unexpected ${url.pathname}`);
+  });
+  assert.deepEqual(await client.getMyProfile(), { id: 'user-1', email: 'dev@example.test', state: 'ACTIVE', firstName: 'Ada', lastName: 'Lovelace', phoneNumber: '+15555550101' });
+  const detail = await client.getApplication(app.appId);
+  assert.equal(detail.channel.wabaId, 'waba-1');
+  assert.equal(detail.contact.email, 'dev@example.test');
+  assert.doesNotMatch(JSON.stringify(detail), /never-show/);
 });
 
 test('does not route around an authorization failure on applications', async () => {
