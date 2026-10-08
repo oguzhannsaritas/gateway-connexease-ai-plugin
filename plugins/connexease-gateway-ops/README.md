@@ -1,6 +1,6 @@
 # Connexease Gateway Operations
 
-This is a local macOS Claude Code/MCP plugin. It is separate from the Gateway documentation plugin and the panel repository. Version: 0.6.0. See the repository [capability matrix](../../CAPABILITY_MATRIX.md) for a feature-by-feature status and remaining gaps.
+This is a local macOS Claude Code/MCP plugin. It is separate from the Gateway documentation plugin and the panel repository. Version: 0.7.0. See the repository [capability matrix](../../CAPABILITY_MATRIX.md) for a feature-by-feature status and remaining gaps.
 
 ## Developer setup
 
@@ -15,6 +15,8 @@ npm run probe
 `npm run probe` checks MCP discovery only; it sends no Gateway request. To load this checkout without publishing, launch `claude --plugin-dir /absolute/path/to/this/folder`. For the published marketplace version, follow the repository README. The `.mcp.json` launches a local stdio process using `node`.
 
 Inside Claude Code, use `/connexease-gateway-ops:connect`, then `/connexease-gateway-ops:panel-ops` or `/connexease-gateway-ops:sandbox-ops`. The connect command opens native email and hidden-password dialogs, calls `POST /auth/token`, checks `GET /users/me`, and stores only the refresh token in the current macOS user's Keychain when possible. The plugin never reads the panel browser cookie or asks for credentials in chat. If Keychain saving fails, it keeps the verified account in process memory and attempts to remove any older stored Gateway token. A failed cleanup is explicitly reported. `disconnect_gateway_account` attempts both Keychain deletion and `POST /auth/logout`, reporting each outcome separately.
+
+For a single Insight page table or chart, use `/connexease-gateway-ops:insights`. It calls only the report underlying the named widget and returns a preformatted terminal table. Time-series widgets include an ASCII line chart for the selected metric; category widgets include a bar chart. This is not the panel's interactive browser chart. The panel's Apps Overview widget still has mock/Coming Soon data, so the plugin reports it as unavailable rather than fabricating account data.
 
 ## Safety model
 

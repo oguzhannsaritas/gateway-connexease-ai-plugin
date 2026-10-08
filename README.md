@@ -1,6 +1,6 @@
 # Connexease Gateway AI plugin
 
-A local Claude Code plugin for a developer's own Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin). Current plugin version: 0.6.0.
+A local Claude Code plugin for a developer's own Connexease Gateway account. It is separate from the [Gateway documentation plugin](https://github.com/oguzhannsaritas/gateway-ai-plugin). Current plugin version: 0.7.0.
 
 ## Install in Claude Code
 
@@ -23,6 +23,8 @@ Test numaralarını göster; seçtiğim numaraya mesajı göndermeden önce öni
 ```
 
 `/connexease-gateway-ops:panel-ops` explains available account, application, template, webhook, billing, insight, and security operations. `/connexease-gateway-ops:sandbox-ops` walks through a real sandbox send. Writes require explicit approval in chat and a second native macOS confirmation. Secrets are entered or displayed locally, never passed to Claude in tool arguments or responses. A successful sandbox API response means Gateway accepted the request, not that WhatsApp delivered it.
+
+The `/connexease-gateway-ops:insights` skill maps a named Insight page widget to one API report. It prints only that widget's table, plus an ASCII line chart for time-series data or a bar chart for category data. `Apps Overview` remains unavailable because the panel still displays mock/Coming Soon data there.
 
 For updates after publication:
 

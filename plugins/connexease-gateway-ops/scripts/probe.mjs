@@ -41,6 +41,8 @@ try {
     'get_whatsapp_template',
     'upload_whatsapp_template_media',
     'get_insights_report',
+    'list_insights_views',
+    'get_insights_view',
     'get_insights_export_rows',
     'save_insights_csv',
     'validate_wallet_coupon',
@@ -76,9 +78,16 @@ try {
     'create_api_key',
     'create_organization_secret',
   ].sort());
+  const views = await client.callTool({ name: 'list_insights_views', arguments: {} });
+  assert.equal(views.isError, undefined);
+  assert.equal(views.structuredContent.views.some(({ id }) => id === 'messagesBreakup'), true);
+  const unavailable = await client.callTool({ name: 'get_insights_view', arguments: { view: 'appsOverview' } });
+  assert.equal(unavailable.isError, undefined);
+  assert.equal(unavailable.structuredContent.status, 'unavailable');
+  assert.match(unavailable.content[0].text, /mock\/Coming Soon/);
   console.log(JSON.stringify({
     tools,
-    notice: 'Tool discovery only. No Gateway request was sent.',
+    notice: 'Tool discovery and offline widget checks only. No Gateway request was sent.',
   }, null, 2));
 } finally {
   await client.close();

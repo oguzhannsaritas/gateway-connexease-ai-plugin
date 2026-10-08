@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
 import { saveInsightsCsv } from './insights-csv.mjs';
+import { getInsightsView, INSIGHT_VIEWS, listInsightsViews } from './insights-view.mjs';
 import { confirmGatewayAction, showGatewaySecret } from './native-confirm.mjs';
 import { selectGatewayUploadFile } from './native-file.mjs';
 import { NativeSession, promptForGatewayCredentials, promptForGatewayOtp, promptForGatewayRegistration, promptForNewPassword, promptForPasswordChange, promptForWebhookHeaderValue } from './native-session.mjs';
@@ -14,7 +15,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.6.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.7.0' });
 let signInInProgress = false;
 let accountWriteInProgress = false;
 
@@ -98,6 +99,17 @@ function guarded(operation) {
         isError: true,
         content: [{ type: 'text', text: error instanceof Error ? error.message : 'Request failed' }],
       };
+    }
+  };
+}
+
+function guardedTerminal(operation) {
+  return async (args) => {
+    try {
+      const value = await operation(args);
+      return { content: [{ type: 'text', text: value.terminalDisplay }], structuredContent: value };
+    } catch (error) {
+      return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : 'Request failed' }] };
     }
   };
 }
@@ -300,7 +312,7 @@ server.registerTool('upload_whatsapp_template_media', {
 })));
 
 server.registerTool('get_insights_report', {
-  description: 'Read one WhatsApp insights report: summary, messages, categories, messaging cost, cost by application, or paginated message breakup. No export or write occurs.',
+  description: 'Low-level raw WhatsApp insights report. When the user names one visible Insight table or chart, use get_insights_view instead; never fetch unrelated reports.',
   inputSchema: {
     report: z.enum(['summary', 'messages', 'categories', 'messagingCost', 'messagingCostApps', 'messagesBreakup']),
     startDate: z.iso.date().optional(),
@@ -312,6 +324,24 @@ server.registerTool('get_insights_report', {
   },
   annotations: { readOnlyHint: true },
 }, guarded((args) => gateway.getInsightsReport(args)));
+
+server.registerTool('list_insights_views', {
+  description: 'List exact Insight page widget names in English and Turkish, including unavailable Coming Soon widgets. Does not call Gateway.',
+  annotations: { readOnlyHint: true },
+}, guarded(() => listInsightsViews()));
+
+server.registerTool('get_insights_view', {
+  description: 'Fetch exactly ONE named Insight page widget, then return only that widget as a terminal-ready table and, when appropriate, an ASCII line or bar chart. Use this when the user names a single table/chart. Never call several reports for one requested view. Apps Overview is marked unavailable rather than using mock data.',
+  inputSchema: {
+    view: z.enum(Object.keys(INSIGHT_VIEWS)),
+    startDate: z.iso.date().optional(), endDate: z.iso.date().optional(),
+    appId: z.string().min(1).max(100).optional(),
+    granularity: z.enum(['hourly', 'daily', 'weekly', 'monthly']).optional(),
+    pageNumber: z.number().int().min(1).optional(), pageSize: z.number().int().min(1).max(100).optional(),
+    metric: z.string().min(1).max(40).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, guardedTerminal((args) => getInsightsView(gateway, args)));
 
 server.registerTool('get_insights_export_rows', {
   description: 'Read the full row data that the panel exports as a WhatsApp insights CSV. This may be large; it does not save a local file.',
