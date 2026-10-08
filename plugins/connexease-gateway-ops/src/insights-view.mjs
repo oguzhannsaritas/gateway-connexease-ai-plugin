@@ -129,42 +129,69 @@ function formatAxis(value) {
   return Number(value.toFixed(3)).toString();
 }
 
-/** Plain-text connected line plot; no terminal color or external dependency. */
+function compactAxis(value) {
+  const magnitude = Math.abs(value);
+  for (const [threshold, suffix] of [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']]) {
+    if (magnitude >= threshold) return `${Number((value / threshold).toFixed(2))}${suffix}`;
+  }
+  return Number(value.toFixed(2)).toString();
+}
+
+const BRAILLE_BITS = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
+
+/** Smooth monochrome line plot using Unicode braille; safe inside Claude's monospace tool output. */
 export function renderTerminalLineChart(rows, metric, xKey = 'date', scale) {
   if (!rows.length) return 'No data for line chart.';
   const values = rows.map((row) => number(row[metric], metric));
-  const width = Math.min(60, Math.max(12, (rows.length - 1) * 3 + 1));
+  const width = Math.min(60, Math.max(28, (rows.length - 1) * 4 + 1));
   const height = 9;
   const min = scale?.min ?? Math.min(0, ...values);
   const max = scale?.max ?? Math.max(0, ...values);
   if (!Number.isFinite(min) || !Number.isFinite(max) || min > max || values.some((value) => value < min || value > max)) {
     throw new Error('Invalid line chart scale');
   }
-  const span = max - min || 1;
+  const plotMax = max === min ? max + 1 : max + (max - min) * 0.06;
+  const span = plotMax - min;
+  const pixelWidth = width * 2;
+  const pixelHeight = height * 4;
   const points = values.map((value, index) => ({
-    x: rows.length === 1 ? Math.floor(width / 2) : Math.round(index * (width - 1) / (rows.length - 1)),
-    y: height - 1 - Math.round((value - min) * (height - 1) / span),
+    x: rows.length === 1 ? Math.floor(pixelWidth / 2) : Math.round(index * (pixelWidth - 1) / (rows.length - 1)),
+    y: Math.round((plotMax - value) * (pixelHeight - 1) / span),
   }));
-  const grid = Array.from({ length: height }, () => Array(width).fill(' '));
+  const cells = Array.from({ length: height }, () => new Uint8Array(width));
+  const dot = (x, y) => {
+    cells[Math.floor(y / 4)][Math.floor(x / 2)] |= BRAILLE_BITS[x % 2][y % 4];
+  };
   for (let index = 1; index < points.length; index += 1) {
     const from = points[index - 1];
     const to = points[index];
     const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-    for (let step = 1; step < steps; step += 1) {
+    if (steps === 0) {
+      dot(from.x, from.y);
+      continue;
+    }
+    for (let step = 0; step <= steps; step += 1) {
       const x = Math.round(from.x + (to.x - from.x) * step / steps);
       const y = Math.round(from.y + (to.y - from.y) * step / steps);
-      grid[y][x] = from.y === to.y ? '-' : to.y < from.y ? '/' : '\\';
+      dot(x, y);
     }
   }
-  for (const point of points) grid[point.y][point.x] = '*';
-  const lines = grid.map((cells, index) => {
-    const axis = index === 0 ? max : index === height - 1 ? min : index === Math.floor(height / 2) ? (max + min) / 2 : null;
-    return `${axis === null ? '        ' : formatAxis(axis).padStart(8)} |${cells.join('')}`;
+  for (const point of points) dot(point.x, point.y);
+  const axisLabels = [plotMax, (plotMax + min) / 2, min].map(compactAxis);
+  const axisWidth = Math.max(5, ...axisLabels.map((value) => value.length));
+  const lines = cells.map((row, index) => {
+    const label = index === 0 ? axisLabels[0] : index === Math.floor(height / 2) ? axisLabels[1] : index === height - 1 ? axisLabels[2] : '';
+    const glyphs = Array.from(row, (bits) => bits ? String.fromCodePoint(0x2800 + bits) : ' ');
+    if (index === Math.floor(points[0].y / 4)) glyphs[Math.floor(points[0].x / 2)] = '●';
+    const last = points.at(-1);
+    if (index === Math.floor(last.y / 4)) glyphs[Math.floor(last.x / 2)] = '●';
+    return `${label.padStart(axisWidth)} ${label ? '┤' : '│'} ${glyphs.join('')}`.trimEnd();
   });
-  lines.push(`         +${'-'.repeat(width)}`);
-  const first = formatValue(rows[0][xKey]);
-  const last = formatValue(rows.at(-1)[xKey]);
-  lines.push(`          ${first}${' '.repeat(Math.max(1, width - first.length - last.length))}${last}`);
+  lines.push(`${' '.repeat(axisWidth)} └${'─'.repeat(width + 1)}`);
+  const labelLimit = Math.floor((width - 2) / 2);
+  const first = formatValue(rows[0][xKey]).slice(0, labelLimit);
+  const last = formatValue(rows.at(-1)[xKey]).slice(0, labelLimit);
+  lines.push(`${' '.repeat(axisWidth + 3)}${rows.length === 1 ? first : first.padEnd(width - last.length) + last}`);
   return lines.join('\n');
 }
 

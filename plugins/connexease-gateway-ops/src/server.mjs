@@ -16,7 +16,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.8.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.9.0' });
 let signInInProgress = false;
 let accountWriteInProgress = false;
 
@@ -332,7 +332,7 @@ server.registerTool('list_insights_views', {
 }, guarded(() => listInsightsViews()));
 
 server.registerTool('get_insights_view', {
-  description: 'Fetch exactly ONE named Insight page widget, then return only that widget as a terminal-ready table and, when appropriate, an ASCII line or bar chart. Use this when the user names a single table/chart. Never call several reports for one requested view. Apps Overview is marked unavailable rather than using mock data.',
+  description: 'Fetch exactly ONE named Insight page widget, then return only that widget as a terminal-ready table and, when appropriate, a monochrome Unicode line chart or bar chart. Use this when the user names a single table/chart. Never call several reports for one requested view. Apps Overview is marked unavailable rather than using mock data.',
   inputSchema: {
     view: z.enum(Object.keys(INSIGHT_VIEWS)),
     startDate: z.iso.date().optional(), endDate: z.iso.date().optional(),
@@ -345,7 +345,7 @@ server.registerTool('get_insights_view', {
 }, guardedTerminal((args) => getInsightsView(gateway, args)));
 
 server.registerTool('compare_insights_periods', {
-  description: 'Compare the SAME named Insight widget across two explicit date ranges. Returns period A, period B, B-minus-A and percentage changes, plus shared-scale ASCII line charts for time series. Breakup table totals include all pages; no unrelated widgets are fetched. Read-only.',
+  description: 'Compare the SAME named Insight widget across two explicit date ranges. Returns period A, period B, B-minus-A and percentage changes, plus shared-scale monochrome Unicode line charts for time series. Breakup table totals include all pages; no unrelated widgets are fetched. Read-only.',
   inputSchema: {
     view: z.enum(Object.keys(INSIGHT_VIEWS)),
     periodA: z.object({ startDate: z.iso.date(), endDate: z.iso.date() }),

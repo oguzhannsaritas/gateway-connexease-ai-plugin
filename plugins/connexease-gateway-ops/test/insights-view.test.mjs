@@ -83,8 +83,29 @@ test('Apps Overview never substitutes mock data or queries unrelated reports', a
 
 test('terminal renderers handle empty, one-point and untrusted label data safely', () => {
   assert.equal(renderTerminalLineChart([], 'total'), 'No data for line chart.');
-  assert.match(renderTerminalLineChart([{ date: '2026-10-01', total: 0 }], 'total'), /\*/);
+  assert.match(renderTerminalLineChart([{ date: '2026-10-01', total: 0 }], 'total'), /●/);
   assert.equal(renderTerminalBarChart([], 'count', 'category'), 'No data for bar chart.');
   assert.doesNotMatch(renderTerminalTable(['date', 'value'], [{ date: '2026-10-01\nattack', value: 1 }]), /\nattack/);
   assert.throws(() => renderTerminalLineChart([{ date: '2026-10-01', total: 'secret' }], 'total'), /invalid total/);
+});
+
+test('line chart has a smooth monochrome curve, readable axes and bounded width', () => {
+  const rows = [2, 4, 3, 8, 6, 12, 10, 15].map((total, index) => ({
+    date: `2026-10-${String(index + 1).padStart(2, '0')}`, total,
+  }));
+  const chart = renderTerminalLineChart(rows, 'total');
+  assert.match(chart, /[\u2801-\u28ff]/);
+  assert.match(chart, /●/);
+  assert.match(chart, /└─/);
+  assert.match(chart, /2026-10-01\s+2026-10-08/);
+  assert.doesNotMatch(chart, /\x1b\[/);
+  assert.ok(chart.split('\n').every((line) => line.length <= 80));
+});
+
+test('line chart handles crowded and shared-scale series without dividing by zero', () => {
+  const rows = Array.from({ length: 200 }, (_, index) => ({ date: String(index), total: index % 9 }));
+  const chart = renderTerminalLineChart(rows, 'total', 'date', { min: 0, max: 10 });
+  assert.match(chart, /[\u2801-\u28ff]/);
+  assert.match(chart, /199/);
+  assert.throws(() => renderTerminalLineChart(rows, 'total', 'date', { min: 0, max: 1 }), /Invalid line chart scale/);
 });
