@@ -1,4 +1,4 @@
-# Gateway panel capability matrix (0.7.0)
+# Gateway panel capability matrix (0.8.0)
 
 Scope: the local Claude Code plugin calls only existing Connexease Gateway API routes. Its tool inventory is not proof that every route is deployed in a particular environment. Automated HTTP-stub contract tests and MCP discovery run locally; account-specific writes below have not been executed against a live Gateway account in this version.
 
@@ -11,7 +11,7 @@ Scope: the local Claude Code plugin calls only existing Connexease Gateway API r
 | Webhooks | Read status, URL/events update, one native-entered secret header update, delete, test, sandbox webhook test | Header values never enter AI arguments/results; server receives one allowlisted write after approval |
 | API keys and organization secrets | List redacted metadata, create with one-time local disclosure, revoke application API keys | No raw key is returned to Claude; organization-secret deletion is not exposed by the current panel helper |
 | Organization and billing | Organization contact, allowed origins add/delete, wallet balance, billing account read/upsert, card metadata, invoices, coupon validation | No full card number or payment credential is returned |
-| Insights | Summary, messages, categories, cost, cost by app, breakup pagination, raw export rows and panel-format CSV save; one named Insight widget at a time with a terminal table and ASCII line/bar chart | CSV destination uses a native save dialog; existing files are not overwritten. Apps Overview remains mock/Coming Soon in the panel |
+| Insights | Summary, messages, categories, cost, cost by app, breakup pagination, raw export rows and panel-format CSV save; one named Insight widget at a time with a terminal table and ASCII line/bar chart; two explicit date ranges compared on the same widget with absolute/percentage deltas | CSV destination uses a native save dialog; existing files are not overwritten. Apps Overview remains mock/Coming Soon in the panel |
 
 ## Not completed by a local API-only plugin
 

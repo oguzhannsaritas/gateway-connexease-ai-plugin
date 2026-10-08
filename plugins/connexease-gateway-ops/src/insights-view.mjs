@@ -43,7 +43,7 @@ function categoryValue(point, category, field) {
   return match ? number(match[field], `${category}.${field}`) : 0;
 }
 
-function rowsForView(view, data) {
+export function rowsForView(view, data) {
   if (view === 'summary') {
     const stats = record(data, 'insights summary');
     return { columns: ['metric', 'value'], rows: SUMMARY_FIELDS.map((metric) => ({ metric, value: number(stats[metric], metric) })), defaultMetric: null };
@@ -130,13 +130,16 @@ function formatAxis(value) {
 }
 
 /** Plain-text connected line plot; no terminal color or external dependency. */
-export function renderTerminalLineChart(rows, metric, xKey = 'date') {
+export function renderTerminalLineChart(rows, metric, xKey = 'date', scale) {
   if (!rows.length) return 'No data for line chart.';
   const values = rows.map((row) => number(row[metric], metric));
   const width = Math.min(60, Math.max(12, (rows.length - 1) * 3 + 1));
   const height = 9;
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
+  const min = scale?.min ?? Math.min(0, ...values);
+  const max = scale?.max ?? Math.max(0, ...values);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max || values.some((value) => value < min || value > max)) {
+    throw new Error('Invalid line chart scale');
+  }
   const span = max - min || 1;
   const points = values.map((value, index) => ({
     x: rows.length === 1 ? Math.floor(width / 2) : Math.round(index * (width - 1) / (rows.length - 1)),

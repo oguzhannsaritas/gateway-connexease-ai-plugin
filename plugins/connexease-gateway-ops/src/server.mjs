@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { GatewayApiClient } from './gateway-api.mjs';
 import { saveInsightsCsv } from './insights-csv.mjs';
+import { compareInsightsPeriods } from './insights-compare.mjs';
 import { getInsightsView, INSIGHT_VIEWS, listInsightsViews } from './insights-view.mjs';
 import { confirmGatewayAction, showGatewaySecret } from './native-confirm.mjs';
 import { selectGatewayUploadFile } from './native-file.mjs';
@@ -15,7 +16,7 @@ const accessTokenProvider = process.platform === 'darwin'
   ? new NativeSession()
   : { getAccessToken: async () => { throw new Error('Local account connection currently supports macOS only'); } };
 const gateway = new GatewayApiClient({ accessTokenProvider });
-const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.7.0' });
+const server = new McpServer({ name: 'connexease-gateway-ops', version: '0.8.0' });
 let signInInProgress = false;
 let accountWriteInProgress = false;
 
@@ -342,6 +343,19 @@ server.registerTool('get_insights_view', {
   },
   annotations: { readOnlyHint: true },
 }, guardedTerminal((args) => getInsightsView(gateway, args)));
+
+server.registerTool('compare_insights_periods', {
+  description: 'Compare the SAME named Insight widget across two explicit date ranges. Returns period A, period B, B-minus-A and percentage changes, plus shared-scale ASCII line charts for time series. Breakup table totals include all pages; no unrelated widgets are fetched. Read-only.',
+  inputSchema: {
+    view: z.enum(Object.keys(INSIGHT_VIEWS)),
+    periodA: z.object({ startDate: z.iso.date(), endDate: z.iso.date() }),
+    periodB: z.object({ startDate: z.iso.date(), endDate: z.iso.date() }),
+    appId: z.string().min(1).max(100).optional(),
+    granularity: z.enum(['hourly', 'daily', 'weekly', 'monthly']).optional(),
+    metric: z.string().min(1).max(40).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, guardedTerminal((args) => compareInsightsPeriods(gateway, args)));
 
 server.registerTool('get_insights_export_rows', {
   description: 'Read the full row data that the panel exports as a WhatsApp insights CSV. This may be large; it does not save a local file.',

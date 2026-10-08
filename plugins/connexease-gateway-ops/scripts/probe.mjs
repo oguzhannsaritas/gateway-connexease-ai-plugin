@@ -43,6 +43,7 @@ try {
     'get_insights_report',
     'list_insights_views',
     'get_insights_view',
+    'compare_insights_periods',
     'get_insights_export_rows',
     'save_insights_csv',
     'validate_wallet_coupon',
@@ -85,6 +86,11 @@ try {
   assert.equal(unavailable.isError, undefined);
   assert.equal(unavailable.structuredContent.status, 'unavailable');
   assert.match(unavailable.content[0].text, /mock\/Coming Soon/);
+  const comparisonUnavailable = await client.callTool({ name: 'compare_insights_periods', arguments: {
+    view: 'appsOverview', periodA: { startDate: '2026-10-01', endDate: '2026-10-02' },
+    periodB: { startDate: '2026-10-03', endDate: '2026-10-04' },
+  } });
+  assert.equal(comparisonUnavailable.structuredContent.status, 'unavailable');
   console.log(JSON.stringify({
     tools,
     notice: 'Tool discovery and offline widget checks only. No Gateway request was sent.',
