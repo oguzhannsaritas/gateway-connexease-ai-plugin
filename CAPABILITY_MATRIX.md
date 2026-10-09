@@ -1,9 +1,10 @@
-# Gateway panel capability matrix (0.9.0)
+# Gateway panel capability matrix (0.10.0)
 
 Scope: the local Claude Code plugin calls only existing Connexease Gateway API routes. Its tool inventory is not proof that every route is deployed in a particular environment. Automated HTTP-stub contract tests and MCP discovery run locally; account-specific writes below have not been executed against a live Gateway account in this version.
 
 | Panel area | Plugin capability | Boundary |
 | --- | --- | --- |
+| Public documentation | Live, read-only answers with verified official links through `/connexease-gateway-ops:ask`; optional docs-only package for Claude/Codex and Gemini CLI skill | No Gateway login needed; documentation content does not authorize account actions. New-repository installs are not yet end-to-end verified |
 | Account | Sign in, sign out, register, change/reset password, phone-code verification, onboarding organization assignment, profile and organization reads | Passwords and codes use native macOS dialogs; signing out reports local Keychain cleanup and remote revocation separately |
 | Applications | List/detail, WhatsApp and Instagram health, WhatsApp business profile, Instagram profile, rename, contact update, WhatsApp username and suggestions | Mutations check application ownership and require native approval |
 | WhatsApp templates | Paginated list/detail, template library/search/filters/detail, create/update/delete, media upload via native file picker | Submission is not Meta approval; media handle is returned to Claude, but local file path is not an AI argument |

@@ -1,12 +1,17 @@
 {
   "name": "connexease-gateway-ai",
-  "description": "Connexease Gateway account tools for Claude Code",
+  "description": "Connexease Gateway account and documentation tools for Claude Code",
   "owner": { "name": "Connexease" },
   "plugins": [
     {
       "name": "connexease-gateway-ops",
       "source": "./plugins/connexease-gateway-ops",
-      "description": "Manage your Gateway account, applications, templates, webhooks and sandbox operations with native confirmation"
+      "description": "Read Gateway docs and manage your account, applications, templates, webhooks and sandbox operations with native confirmation"
+    },
+    {
+      "name": "connexease-gateway-docs",
+      "source": "./plugins/connexease-gateway-docs",
+      "description": "Optional read-only documentation plugin for the legacy docs command"
     }
   ]
 }

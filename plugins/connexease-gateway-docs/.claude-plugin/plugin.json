@@ -1,0 +1,6 @@
+{
+  "name": "connexease-gateway-docs",
+  "description": "Read-only answers grounded in the public Connexease Gateway documentation.",
+  "version": "0.2.0",
+  "author": { "name": "Connexease" }
+}

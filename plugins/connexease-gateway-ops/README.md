@@ -1,6 +1,13 @@
 # Connexease Gateway Operations
 
-This is a local macOS Claude Code/MCP plugin. It is separate from the Gateway documentation plugin and the panel repository. Version: 0.9.0. See the repository [capability matrix](../../CAPABILITY_MATRIX.md) for a feature-by-feature status and remaining gaps.
+This is a local macOS Claude Code/MCP plugin for account operations and public documentation questions. Version: 0.10.0. It remains separate from the panel repository. See the repository [capability matrix](../../CAPABILITY_MATRIX.md) for feature status and remaining gaps.
+
+Install the combined Claude plugin from this repository's marketplace:
+
+```bash
+claude plugin marketplace add oguzhannsaritas/gateway-connexease-ai-plugin
+claude plugin install connexease-gateway-ops@connexease-gateway-ai
+```
 
 ## Developer setup
 
@@ -14,7 +21,7 @@ npm run probe
 
 `npm run probe` checks MCP discovery only; it sends no Gateway request. To load this checkout without publishing, launch `claude --plugin-dir /absolute/path/to/this/folder`. For the published marketplace version, follow the repository README. The `.mcp.json` launches a local stdio process using `node`.
 
-Inside Claude Code, use `/connexease-gateway-ops:connect`, then `/connexease-gateway-ops:panel-ops` or `/connexease-gateway-ops:sandbox-ops`. The connect command opens native email and hidden-password dialogs, calls `POST /auth/token`, checks `GET /users/me`, and stores only the refresh token in the current macOS user's Keychain when possible. The plugin never reads the panel browser cookie or asks for credentials in chat. If Keychain saving fails, it keeps the verified account in process memory and attempts to remove any older stored Gateway token. A failed cleanup is explicitly reported. `disconnect_gateway_account` attempts both Keychain deletion and `POST /auth/logout`, reporting each outcome separately.
+Inside Claude Code, use `/connexease-gateway-ops:ask` for live public-doc questions without account login. For account operations, use `/connexease-gateway-ops:connect`, then `/connexease-gateway-ops:panel-ops` or `/connexease-gateway-ops:sandbox-ops`. The connect command opens native email and hidden-password dialogs, calls `POST /auth/token`, checks `GET /users/me`, and stores only the refresh token in the current macOS user's Keychain when possible. The plugin never reads the panel browser cookie or asks for credentials in chat. If Keychain saving fails, it keeps the verified account in process memory and attempts to remove any older stored Gateway token. A failed cleanup is explicitly reported. `disconnect_gateway_account` attempts both Keychain deletion and `POST /auth/logout`, reporting each outcome separately.
 
 For a single Insight page table or chart, use `/connexease-gateway-ops:insights`. It calls only the report underlying the named widget and returns a preformatted terminal table. Time-series widgets include a monochrome Unicode/braille line chart for the selected metric; category widgets include a bar chart. The chart keeps readable numeric axes and date endpoints without ANSI colors, and comparison charts share one y-axis scale. This is not the panel's interactive browser chart. The panel's Apps Overview widget still has mock/Coming Soon data, so the plugin reports it as unavailable rather than fabricating account data.
 
@@ -32,4 +39,4 @@ Sandbox template sends use the Gateway template's internal UUID and revalidate a
 
 The automated suite uses isolated HTTP stubs and does not contact a live account. Authentication and the legacy application-list fallback were manually tested in earlier versions, but the expanded 0.6.0 operations require dedicated staging verification. Existing routes and request shapes were compared to the panel helpers and locally available core-service source; deployed environments may differ.
 
-This plugin is not a ChatGPT, Gemini, or Claude web-chat connector. A hosted HTTPS MCP server with per-user OAuth is separate work.
+The bundled docs skill reads only the live official public documentation and cannot authorize an account mutation. The optional docs-only plugin and Gemini CLI skill in this repository do not expose the operations MCP server. Account operations are not a ChatGPT, Gemini, or Claude web-chat connector; a hosted integration with per-user authorization is separate work.
