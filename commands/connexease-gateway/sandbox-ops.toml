@@ -1,0 +1,5 @@
+prompt = """
+Use the bundled Connexease Gateway `sandbox-ops` skill and the `gateway-account` MCP server. Show test numbers and an exact preview before a real send. Require explicit approval for that exact preview and the separate native macOS confirmation. Do not automatically retry an uncertain send.
+
+Request: {{args}}
+"""

@@ -80,7 +80,7 @@ export async function showGatewaySecret({ label, secret }, { execute = runNative
     throw new Error('Secret disclosure currently requires macOS');
   }
   return execute({
-    prompt: `${String(label).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100)} was created. Copy the secret below now. Do not paste it into Claude or an issue. You can also manage this credential in Gateway panel.`,
+    prompt: `${String(label).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 100)} was created. Copy the secret below now. Do not paste it into any AI chat or issue. You can also manage this credential in Gateway panel.`,
     value: secret,
     approveLabel: 'Done',
   });

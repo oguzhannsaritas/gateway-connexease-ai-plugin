@@ -139,7 +139,7 @@ function compactAxis(value) {
 
 const BRAILLE_BITS = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
 
-/** Smooth monochrome line plot using Unicode braille; safe inside Claude's monospace tool output. */
+/** Smooth monochrome line plot using Unicode braille; safe inside monospace tool output. */
 export function renderTerminalLineChart(rows, metric, xKey = 'date', scale) {
   if (!rows.length) return 'No data for line chart.';
   const values = rows.map((row) => number(row[metric], metric));

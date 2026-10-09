@@ -128,7 +128,7 @@ export class MacKeychainStore {
         'find-generic-password', '-a', KEYCHAIN_ACCOUNT, '-s', KEYCHAIN_SERVICE, '-w',
       ]);
     } catch {
-      throw new Error('Gateway login required. Run /connexease-gateway-ops:connect in Claude Code.');
+      throw new Error('Gateway login required. Use the connect skill or call connect_gateway_account in this local AI client.');
     }
   }
 
@@ -300,7 +300,7 @@ export class NativeSession {
   }
 
   async verifyPasswordResetCode(code) {
-    if (!this.#passwordResetTarget) throw new Error('Start password reset in this Claude session first');
+    if (!this.#passwordResetTarget) throw new Error('Start password reset in this AI client session first');
     if (typeof code !== 'string' || !/^\d{4,10}$/.test(code)) throw new Error('Verification code is invalid');
     const data = await postAuthData('/auth/two-factor/verify', {
       code, verificationSource: 'WHATSAPP', type: 'FORGET_PASSWORD', target: this.#passwordResetTarget,
@@ -311,7 +311,7 @@ export class NativeSession {
   }
 
   async finishPasswordReset(passwords) {
-    if (!this.#passwordResetToken) throw new Error('Verify the password reset code in this Claude session first');
+    if (!this.#passwordResetToken) throw new Error('Verify the password reset code in this AI client session first');
     if (!passwords?.newPassword || passwords.newPassword !== passwords.confirmPassword) throw new Error('New passwords do not match');
     const token = this.#passwordResetToken;
     this.#passwordResetToken = null;
@@ -347,7 +347,7 @@ export class NativeSession {
   }
 
   async getAccessToken() {
-    if (this.#signedOut) throw new Error('Gateway login required. Run /connexease-gateway-ops:connect in Claude Code.');
+    if (this.#signedOut) throw new Error('Gateway login required. Use the connect skill or call connect_gateway_account in this local AI client.');
     if (this.#accessToken && Date.now() < this.#expiresAt - 60_000) return this.#accessToken;
     if (!this.#refreshInFlight) {
       this.#refreshInFlight = this.#refresh().finally(() => { this.#refreshInFlight = null; });

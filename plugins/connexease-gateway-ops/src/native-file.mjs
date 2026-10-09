@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 
 const PICK_FILE_SCRIPT = 'POSIX path of (choose file with prompt "Select one file to upload to your Connexease Gateway WhatsApp account")';
 
-/** The developer, not Claude, selects a local file in the native macOS picker. */
+/** The developer, not the AI client, selects a local file in the native macOS picker. */
 export function selectGatewayUploadFile(spawnImpl = spawn) {
   if (process.platform !== 'darwin' && spawnImpl === spawn) throw new Error('Native file selection currently supports macOS only');
   return new Promise((resolve, reject) => {
@@ -20,7 +20,7 @@ export function selectGatewayUploadFile(spawnImpl = spawn) {
   });
 }
 
-/** Native save dialog; Claude cannot select or overwrite a local path. */
+/** Native save dialog; the AI client cannot select or overwrite a local path. */
 export function selectGatewayCsvDestination(filename, spawnImpl = spawn) {
   if (!/^insights_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.csv$/.test(filename)) throw new Error('Invalid insights CSV filename');
   if (process.platform !== 'darwin' && spawnImpl === spawn) throw new Error('Native CSV save currently supports macOS only');

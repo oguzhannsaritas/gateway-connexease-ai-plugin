@@ -1,0 +1,12 @@
+{
+  "name": "gateway-connexease-ai-plugin",
+  "version": "0.11.0",
+  "description": "Connexease Gateway documentation and account operations with local macOS confirmation.",
+  "mcpServers": {
+    "gateway-account": {
+      "command": "node",
+      "args": ["${extensionPath}${/}plugins${/}connexease-gateway-ops${/}dist${/}server.mjs"],
+      "cwd": "${extensionPath}"
+    }
+  }
+}

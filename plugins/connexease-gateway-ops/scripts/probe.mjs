@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-const serverPath = fileURLToPath(new URL('../src/server.mjs', import.meta.url));
+const serverPath = process.argv[2]
+  ? resolve(process.argv[2])
+  : fileURLToPath(new URL('../src/server.mjs', import.meta.url));
 const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath] });
 const client = new Client({ name: 'gateway-ops-probe', version: '0.1.0' });
 

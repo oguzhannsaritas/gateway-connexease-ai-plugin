@@ -5,6 +5,18 @@
   },
   "plugins": [
     {
+      "name": "connexease-gateway-ops",
+      "source": {
+        "source": "local",
+        "path": "./plugins/connexease-gateway-ops"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "connexease-gateway-docs",
       "source": {
         "source": "local",

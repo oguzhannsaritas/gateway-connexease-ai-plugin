@@ -1,6 +1,6 @@
 # Connexease Gateway AI plugin
 
-This repository combines the Connexease Gateway account-operations plugin and the public-documentation assistant. The Claude Code `connexease-gateway-ops` installation includes both: use `/connexease-gateway-ops:ask` for documentation and the existing account tools for your own Gateway account. Documentation questions do not require signing in to Gateway. Operations version: 0.10.0.
+This repository combines Connexease Gateway account operations and the public-documentation assistant. The `connexease-gateway-ops` package includes both: documentation questions need no Gateway login, while account operations use the user's own Gateway account. Operations version: 0.11.0.
 
 ## Install in Claude Code
 
@@ -31,22 +31,30 @@ The `/connexease-gateway-ops:insights` skill maps a named Insight page widget to
 
 The comparison workflow accepts two explicit date ranges for one Insight widget. It displays period values, B-minus-A differences and percentage changes, with shared-scale line charts for time series. Paginated breakup comparisons load every page or fail rather than reporting partial totals.
 
-## Documentation-only and other AI clients
+## Codex and Gemini CLI
 
 For the legacy `/connexease-gateway-docs:ask` command, this marketplace also contains an optional read-only `connexease-gateway-docs` plugin. New Claude users need only `connexease-gateway-ops`; installing both creates two documentation commands. The old [documentation repository](https://github.com/oguzhannsaritas/gateway-ai-plugin) and any existing installation remain untouched. Existing users may keep the old plugin or migrate manually; no uninstall happens automatically.
 
-The same repository carries a portable **documentation-only** plugin for Codex CLI/ChatGPT desktop and a Gemini CLI skill. Neither receives the Claude account-operation MCP tools:
+Codex CLI/desktop can install the same operations plugin from this repository's portable marketplace. The optional `connexease-gateway-docs` package remains read-only:
 
 ```bash
 codex plugin marketplace add oguzhannsaritas/gateway-connexease-ai-plugin
-codex plugin add connexease-gateway-docs@connexease-gateway-ai
+codex plugin add connexease-gateway-ops@connexease-gateway-ai
+codex
 ```
+
+In Codex, ask naturally (for example, “Gateway hesabıma bağlan ve uygulamalarımı göster”) or invoke an installed skill by name through the Codex skill picker. The operations package supplies `ask`, `connect`, `panel-ops`, `sandbox-ops`, and `insights` skills and the `gateway-account` MCP tools; it is not limited to documentation questions. Codex does not use Claude's `/connexease-gateway-ops:...` command syntax.
+
+For Gemini CLI, install the repository as an extension, not the older docs-only skill:
 
 ```bash
-gemini skills install https://github.com/oguzhannsaritas/gateway-connexease-ai-plugin.git --path gemini-cli/connexease-gateway-docs
+gemini extensions install https://github.com/oguzhannsaritas/gateway-connexease-ai-plugin.git
+gemini
 ```
 
-These new-repository install paths still need an independent installation test. ChatGPT web and Gemini web/app do not automatically load these local plugins; see [distribution status](DISTRIBUTION.md) and the [manual Gemini chat draft](guides/gemini-chat-instructions.md).
+Gemini CLI can answer natural-language requests or use `/connexease-gateway:ask`, `/connexease-gateway:connect`, `/connexease-gateway:panel-ops`, `/connexease-gateway:sandbox-ops`, and `/connexease-gateway:insights`. The extension bundles the same local account server and skills. The operations flow requires macOS, Node.js 20+, visible native dialogs, the user's Gateway credentials entered locally, explicit chat approval for writes, and a separate native confirmation.
+
+These new install paths are prepared in source but still need independent end-to-end installation and account testing after publication. ChatGPT web and Gemini web/app do not automatically load local Git plugins; see [distribution status](DISTRIBUTION.md) and the [manual Gemini chat draft](guides/gemini-chat-instructions.md).
 
 For updates:
 
@@ -57,4 +65,4 @@ claude plugin update connexease-gateway-ops@connexease-gateway-ai
 
 Restart Claude Code after updating. See [capability matrix](CAPABILITY_MATRIX.md) for supported operations and the separately reported gaps, and [implementation details](plugins/connexease-gateway-ops/README.md) for local validation and security boundaries.
 
-The account-operation tools remain a local macOS Claude Code plugin, not a ChatGPT/Gemini/Claude web-chat connector. Those surfaces need a separately designed hosted integration and per-user authorization for account actions.
+The account-operation tools remain a local macOS integration for Claude Code, Codex, and Gemini CLI, not a ChatGPT/Gemini/Claude web-chat connector. Those surfaces need a separately designed hosted integration and per-user authorization for account actions.
