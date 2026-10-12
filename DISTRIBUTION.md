@@ -1,6 +1,6 @@
 # Distribution and verification status
 
-This public test repository contains the local operations server and public-documentation skills in version 0.12.1. The earlier `gateway-ai-plugin` documentation repository is not changed or removed. Existing installations are not migrated automatically.
+This public test repository contains the local operations server and public-documentation skills in version 0.13.0. The earlier `gateway-ai-plugin` documentation repository is not changed or removed. Existing installations are not migrated automatically.
 
 This repository can be installed from its public GitHub URL for testing. The separate Connexease-owned customer repository may have different access requirements; publishing this test repository does not change its visibility or replace customer acceptance testing.
 
