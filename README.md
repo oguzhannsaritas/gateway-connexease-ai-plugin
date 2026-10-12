@@ -1,6 +1,6 @@
 # Connexease Gateway AI plugin
 
-This public test repository combines Gateway account operations and the public-documentation assistant. The `connexease-gateway-ops` package includes both: documentation questions need no Gateway login, while account operations use the user's own Gateway account. Operations version: 0.13.1. The Claude/Codex marketplace is named `connexease-gateway-ai`; the Gemini extension is named `gateway-connexease-ai-plugin`. The operations skill names stay `connexease-gateway-ops`.
+This public test repository combines Gateway account operations and the public-documentation assistant. The `connexease-gateway-ops` package includes both: documentation questions need no Gateway login, while account operations use the user's own Gateway account. Operations version: 0.13.2. The Claude/Codex marketplace is named `connexease-gateway-ai`; the Gemini extension is named `gateway-connexease-ai-plugin`. The operations skill names stay `connexease-gateway-ops`.
 
 This repository is public for testing. The separate Connexease-owned customer repository may have different access requirements; publication here does not make that repository public or constitute a production rollout.
 
