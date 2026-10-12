@@ -1,5 +1,5 @@
 {
-  "name": "connexease-gateway-customer-mcp",
+  "name": "connexease-gateway-ai",
   "description": "Connexease Gateway customer account and documentation tools for Claude Code",
   "owner": { "name": "Connexease" },
   "plugins": [

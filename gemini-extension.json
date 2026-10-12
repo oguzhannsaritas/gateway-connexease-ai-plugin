@@ -1,5 +1,5 @@
 {
-  "name": "connexease-gateway-customer-mcp",
+  "name": "gateway-connexease-ai-plugin",
   "version": "0.12.1",
   "description": "Connexease Gateway documentation and account operations with local macOS or Windows confirmation.",
   "mcpServers": {

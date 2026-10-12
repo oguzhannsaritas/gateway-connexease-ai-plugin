@@ -1,8 +1,8 @@
 # Distribution and verification status
 
-This Connexease-owned repository contains the local operations server and public-documentation skills in version 0.12.1. The earlier personal `gateway-connexease-ai-plugin` and `gateway-ai-plugin` repositories are not changed or removed. Existing installations of their marketplaces are not migrated automatically.
+This public test repository contains the local operations server and public-documentation skills in version 0.12.1. The earlier `gateway-ai-plugin` documentation repository is not changed or removed. Existing installations are not migrated automatically.
 
-The Connexease repository is currently **private**. The GitHub install commands require repository access and are not yet a public customer distribution path. No repository visibility change is performed by this code release.
+This repository can be installed from its public GitHub URL for testing. The separate Connexease-owned customer repository may have different access requirements; publishing this test repository does not change its visibility or replace customer acceptance testing.
 
 | Surface | This repository provides | Verification boundary |
 | --- | --- | --- |

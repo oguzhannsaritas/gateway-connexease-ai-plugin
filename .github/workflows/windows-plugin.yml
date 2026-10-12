@@ -2,7 +2,7 @@ name: Windows plugin verification
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
